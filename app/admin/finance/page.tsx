@@ -39,25 +39,37 @@ function FinanceReportingContent() {
   const [dateRange, setDateRange] = useState('30')
 
   const filteredTransactions = recentTransactions.filter(transaction => {
-    const matchesSearch = 
+    const matchesSearch =
       transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.category.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesFilter = transactionFilter === 'all' || transaction.type === transactionFilter
-    
+
     return matchesSearch && matchesFilter
   })
 
+  // Calculate financial stats with safe fallbacks for empty data
+  const totalRevenue = revenueData.reduce((acc, month) => acc + month.revenue, 0)
+  const totalExpenses = revenueData.reduce((acc, month) => acc + month.expenses, 0)
+  const totalProfit = revenueData.reduce((acc, month) => acc + month.profit, 0)
+  const avgMonthlyRevenue = revenueData.length > 0 ? Math.round(totalRevenue / revenueData.length) : 0
+  const currentMonthData = revenueData.length > 0 ? revenueData[revenueData.length - 1] : { revenue: 0, profit: 0 }
+  const previousMonthData = revenueData.length > 1 ? revenueData[revenueData.length - 2] : { revenue: 1 }
+  const currentMonthRevenue = currentMonthData.revenue
+  const currentMonthProfit = currentMonthData.profit
+  const profitMargin = currentMonthData.revenue > 0 ? Math.round((currentMonthData.profit / currentMonthData.revenue) * 100) : 0
+  const revenueGrowth = previousMonthData.revenue > 0 ? Math.round(((currentMonthData.revenue - previousMonthData.revenue) / previousMonthData.revenue) * 100) : 0
+
   const financeStats = {
-    totalRevenue: revenueData.reduce((acc, month) => acc + month.revenue, 0),
-    totalExpenses: revenueData.reduce((acc, month) => acc + month.expenses, 0),
-    totalProfit: revenueData.reduce((acc, month) => acc + month.profit, 0),
-    avgMonthlyRevenue: Math.round(revenueData.reduce((acc, month) => acc + month.revenue, 0) / revenueData.length),
-    currentMonthRevenue: revenueData[revenueData.length - 1].revenue,
-    currentMonthProfit: revenueData[revenueData.length - 1].profit,
-    profitMargin: Math.round((revenueData[revenueData.length - 1].profit / revenueData[revenueData.length - 1].revenue) * 100),
-    revenueGrowth: Math.round(((revenueData[revenueData.length - 1].revenue - revenueData[revenueData.length - 2].revenue) / revenueData[revenueData.length - 2].revenue) * 100)
+    totalRevenue,
+    totalExpenses,
+    totalProfit,
+    avgMonthlyRevenue,
+    currentMonthRevenue,
+    currentMonthProfit,
+    profitMargin,
+    revenueGrowth
   }
 
   return (
