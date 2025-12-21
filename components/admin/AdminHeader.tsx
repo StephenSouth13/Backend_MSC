@@ -51,12 +51,8 @@ export function AdminHeader({ onToggleSidebar, sidebarCollapsed }: AdminHeaderPr
     getUser()
   }, [])
 
-  // Mock notifications
-  const notifications = [
-    { id: 1, title: 'Người dùng mới đăng ký', time: '2 phút trước', unread: true },
-    { id: 2, title: 'Khóa học được cập nhật', time: '1 giờ trước', unread: true },
-    { id: 3, title: 'Đã nhận thanh toán', time: '3 giờ trước', unread: false },
-  ]
+  // TODO: Load real notifications from database
+  const notifications: Array<{ id: number; title: string; time: string; unread: boolean }> = []
 
   const unreadCount = notifications.filter(n => n.unread).length
 

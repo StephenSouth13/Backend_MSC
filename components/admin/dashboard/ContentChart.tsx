@@ -15,26 +15,19 @@ import {
   Cell
 } from 'recharts'
 
-const contentData = [
-  { month: 'Jan', articles: 15, courses: 3, projects: 8 },
-  { month: 'Feb', articles: 22, courses: 5, projects: 12 },
-  { month: 'Mar', articles: 18, courses: 4, projects: 10 },
-  { month: 'Apr', articles: 28, courses: 6, projects: 15 },
-  { month: 'May', articles: 25, courses: 7, projects: 18 },
-  { month: 'Jun', articles: 32, courses: 5, projects: 20 },
-  { month: 'Jul', articles: 29, courses: 8, projects: 16 },
-  { month: 'Aug', articles: 35, courses: 6, projects: 22 },
-  { month: 'Sep', articles: 31, courses: 9, projects: 19 },
-  { month: 'Oct', articles: 38, courses: 7, projects: 25 },
-  { month: 'Nov', articles: 42, courses: 10, projects: 28 },
-  { month: 'Dec', articles: 45, courses: 8, projects: 30 }
-]
+// TODO: Fetch content data from database
+interface ContentChartProps {
+  data?: Array<{ month: string; articles: number; courses: number; projects: number }>
+  distributionData?: Array<{ name: string; value: number; color: string }>
+}
 
-const contentTypeData = [
-  { name: 'Articles', value: 165, color: '#0d9488' },
-  { name: 'Courses', value: 42, color: '#6366f1' },
-  { name: 'Projects', value: 89, color: '#f59e0b' },
-  { name: 'Media', value: 234, color: '#8b5cf6' }
+const defaultData: Array<{ month: string; articles: number; courses: number; projects: number }> = []
+
+const defaultDistributionData = [
+  { name: 'Articles', value: 0, color: '#0d9488' },
+  { name: 'Courses', value: 0, color: '#6366f1' },
+  { name: 'Projects', value: 0, color: '#f59e0b' },
+  { name: 'Media', value: 0, color: '#8b5cf6' }
 ]
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -68,7 +61,9 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   return null
 }
 
-export function ContentChart() {
+export function ContentChart({ data = defaultData }: ContentChartProps) {
+  const chartData = data.length > 0 ? data : defaultData
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -87,7 +82,7 @@ export function ContentChart() {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={contentData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="articlesGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3} />
@@ -145,7 +140,9 @@ export function ContentChart() {
   )
 }
 
-export function ContentDistributionChart() {
+export function ContentDistributionChart({ distributionData = defaultDistributionData }: ContentChartProps) {
+  const chartData = distributionData.length > 0 ? distributionData : defaultDistributionData
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -166,7 +163,7 @@ export function ContentDistributionChart() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={contentTypeData}
+                  data={chartData}
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
@@ -174,7 +171,7 @@ export function ContentDistributionChart() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {contentTypeData.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -183,7 +180,7 @@ export function ContentDistributionChart() {
             </ResponsiveContainer>
           </div>
           <div className="grid grid-cols-2 gap-4 mt-4">
-            {contentTypeData.map((item, index) => (
+            {chartData.map((item, index) => (
               <div key={index} className="flex items-center space-x-2">
                 <div 
                   className="w-3 h-3 rounded-full" 

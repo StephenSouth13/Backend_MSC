@@ -1,74 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { v2 as cloudinary } from 'cloudinary'
+import { getMediaFiles } from '@/lib/supabase-storage'
 
-// Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const revalidate = 0
 
-// Cấu hình Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
-
 export async function GET(req: NextRequest) {
   try {
-    // Validate env
-    if (
-      !process.env.CLOUDINARY_CLOUD_NAME ||
-      !process.env.CLOUDINARY_API_KEY ||
-      !process.env.CLOUDINARY_API_SECRET
-    ) {
-      return NextResponse.json(
-        { success: false, error: 'Cloudinary not configured' },
-        { status: 500 }
-      )
-    }
-
-    // Extract query parameters using headers approach for better compatibility
-    const url = req.url
-    const urlObj = new URL(url)
+    const { searchParams } = new URL(req.url)
     
-    const folder = urlObj.searchParams.get('folder') || ''
-    const tagsParam = urlObj.searchParams.get('tags')
-    const tags = tagsParam ? tagsParam.split(',') : []
-    const limitParam = urlObj.searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam, 10) : 50
-    const nextCursor = urlObj.searchParams.get('next_cursor') || undefined
+    const folder = searchParams.get('folder') || 'uploads'
+    const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const offset = parseInt(searchParams.get('offset') || '0', 10)
+    const fileType = searchParams.get('file_type') || undefined
 
-    // Build expression
-    let expression = 'resource_type:image'
-    if (folder) expression += ` AND folder:${folder}*`
-    if (tags.length > 0) {
-      const tagQuery = tags.map(tag => `tags:${tag}`).join(' AND ')
-      expression += ` AND (${tagQuery})`
-    }
-
-    // Gọi Cloudinary search API
-    const result = await cloudinary.search
-      .expression(expression)
-      .sort_by('created_at', 'desc')
-      .max_results(limit)
-      .next_cursor(nextCursor)
-      .execute()
+    const result = await getMediaFiles({
+      folder,
+      limit,
+      offset,
+      file_type: fileType
+    })
 
     return NextResponse.json({
-      success: true,
-      data: {
-        resources: result.resources,
-        next_cursor: result.next_cursor,
-        total_count: result.total_count,
-      },
+      success: result.success,
+      data: result.data,
+      error: result.error
     })
-  } catch (err) {
-    console.error('Error fetching images:', err)
+  } catch (error) {
+    console.error('Error fetching media:', error)
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch images',
-        message: err instanceof Error ? err.message : 'Unknown error',
+        error: 'Failed to fetch media files',
+        message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     )

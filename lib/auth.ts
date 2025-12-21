@@ -11,34 +11,10 @@ export interface AuthState {
   isAuthenticated: boolean
 }
 
-// Mock users for development
-const mockUsers = [
-  { 
-    id: '1', 
-    email: 'admin_msc@gmail.com', 
-    name: 'MSC Admin', 
-    role: 'admin' as const 
-  },
-  { 
-    id: '2', 
-    email: 'editor@gmail.com', 
-    name: 'MSC Editor', 
-    role: 'editor' as const 
-  }
-]
-
-// Authentication functions
+// Authentication functions - Use Supabase for real authentication
 export function authenticateUser(email: string, password: string): User | null {
-  // Mock password check
-  const passwords: Record<string, string> = {
-    'admin_msc@gmail.com': 'StrongPass!123',
-    'editor@gmail.com': '123456'
-  }
-
-  if (passwords[email] === password) {
-    return mockUsers.find(u => u.email === email) || null
-  }
-  
+  // This function is deprecated. Use Supabase authentication instead.
+  // See components/auth/AuthProvider.tsx for client-side auth
   return null
 }
 
