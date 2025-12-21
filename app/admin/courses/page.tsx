@@ -26,8 +26,9 @@ function CoursesManagementContent() {
   )
 
   const handleCreateCourse = (courseData: any) => {
+    const nextId = courses.length > 0 ? Math.max(...courses.map(c => c.id)) + 1 : 1
     const newCourse = {
-      id: Math.max(...courses.map(c => c.id)) + 1,
+      id: nextId,
       ...courseData,
       students: 0,
       rating: 0,
