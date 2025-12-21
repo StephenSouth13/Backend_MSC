@@ -104,29 +104,41 @@ function FinanceReportingContent() {
       <FinanceOverview stats={financeStats} />
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {revenueData.length === 0 ? (
         <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-              Revenue & Profit Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart data={revenueData} />
+          <CardContent className="p-12">
+            <div className="text-center space-y-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                Không có dữ liệu tài chính. Vui lòng tạo giao dịch để xem biểu đồ.
+              </p>
+            </div>
           </CardContent>
         </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                Revenue & Profit Trends
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RevenueChart data={revenueData} />
+            </CardContent>
+          </Card>
 
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-              Expense Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ExpenseChart data={expenseBreakdown} />
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+                Expense Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExpenseChart data={expenseBreakdown} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
