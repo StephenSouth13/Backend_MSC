@@ -10,99 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Search, BookOpen, Clock, Users, TrendingUp } from 'lucide-react'
 
-// Sample course data for demo
-const initialCourses = [
-  {
-    id: 1,
-    title: 'Advanced React Patterns',
-    description: 'Master advanced React patterns including hooks, context, and performance optimization',
-    instructor: 'John Doe',
-    category: 'frontend' as const,
-    difficulty: 'advanced' as const,
-    status: 'published' as const,
-    price: 299,
-    duration: '8 weeks',
-    students: 156,
-    rating: 4.8,
-    createdAt: '2024-01-15',
-    updatedAt: '2024-09-10'
-  },
-  {
-    id: 2,
-    title: 'Next.js Full Stack Development',
-    description: 'Build modern web applications with Next.js, TypeScript, and database integration',
-    instructor: 'Jane Smith',
-    category: 'fullstack' as const,
-    difficulty: 'intermediate' as const,
-    status: 'published' as const,
-    price: 399,
-    duration: '12 weeks',
-    students: 234,
-    rating: 4.9,
-    createdAt: '2024-02-10',
-    updatedAt: '2024-09-15'
-  },
-  {
-    id: 3,
-    title: 'JavaScript Fundamentals',
-    description: 'Learn the core concepts of JavaScript from scratch to advanced topics',
-    instructor: 'Mike Johnson',
-    category: 'frontend' as const,
-    difficulty: 'beginner' as const,
-    status: 'published' as const,
-    price: 199,
-    duration: '6 weeks',
-    students: 445,
-    rating: 4.7,
-    createdAt: '2024-03-05',
-    updatedAt: '2024-09-05'
-  },
-  {
-    id: 4,
-    title: 'Node.js API Development',
-    description: 'Build scalable backend APIs with Node.js, Express, and MongoDB',
-    instructor: 'Sarah Wilson',
-    category: 'backend' as const,
-    difficulty: 'intermediate' as const,
-    status: 'draft' as const,
-    price: 349,
-    duration: '10 weeks',
-    students: 0,
-    rating: 0,
-    createdAt: '2024-08-20',
-    updatedAt: '2024-09-18'
-  },
-  {
-    id: 5,
-    title: 'Python for Data Science',
-    description: 'Complete guide to data analysis and machine learning with Python',
-    instructor: 'David Brown',
-    category: 'data' as const,
-    difficulty: 'intermediate' as const,
-    status: 'published' as const,
-    price: 449,
-    duration: '14 weeks',
-    students: 189,
-    rating: 4.6,
-    createdAt: '2024-04-12',
-    updatedAt: '2024-09-12'
-  },
-  {
-    id: 6,
-    title: 'UI/UX Design Masterclass',
-    description: 'Design beautiful and user-friendly interfaces with modern design principles',
-    instructor: 'Lisa Garcia',
-    category: 'design' as const,
-    difficulty: 'beginner' as const,
-    status: 'review' as const,
-    price: 279,
-    duration: '8 weeks',
-    students: 0,
-    rating: 0,
-    createdAt: '2024-07-15',
-    updatedAt: '2024-09-19'
-  }
-]
+// TODO: Fetch real course data from database
+const initialCourses: Array<any> = []
 
 function CoursesManagementContent() {
   const [courses, setCourses] = useState(initialCourses)
@@ -117,8 +26,9 @@ function CoursesManagementContent() {
   )
 
   const handleCreateCourse = (courseData: any) => {
+    const nextId = courses.length > 0 ? Math.max(...courses.map(c => c.id)) + 1 : 1
     const newCourse = {
-      id: Math.max(...courses.map(c => c.id)) + 1,
+      id: nextId,
       ...courseData,
       students: 0,
       rating: 0,

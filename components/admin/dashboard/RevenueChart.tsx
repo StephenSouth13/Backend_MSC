@@ -14,20 +14,12 @@ import {
   AreaChart
 } from 'recharts'
 
-const revenueData = [
-  { month: 'Jan', revenue: 32000, target: 30000 },
-  { month: 'Feb', revenue: 38000, target: 35000 },
-  { month: 'Mar', revenue: 35000, target: 40000 },
-  { month: 'Apr', revenue: 42000, target: 38000 },
-  { month: 'May', revenue: 45000, target: 42000 },
-  { month: 'Jun', revenue: 48000, target: 45000 },
-  { month: 'Jul', revenue: 52000, target: 48000 },
-  { month: 'Aug', revenue: 49000, target: 50000 },
-  { month: 'Sep', revenue: 55000, target: 52000 },
-  { month: 'Oct', revenue: 58000, target: 55000 },
-  { month: 'Nov', revenue: 61000, target: 58000 },
-  { month: 'Dec', revenue: 65000, target: 62000 }
-]
+// TODO: Fetch revenue data from database
+interface RevenueChartProps {
+  data?: Array<{ month: string; revenue: number; target: number }>
+}
+
+const defaultData: Array<{ month: string; revenue: number; target: number }> = []
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -45,7 +37,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-export function RevenueChart() {
+export function RevenueChart({ data = defaultData }: RevenueChartProps) {
+  const chartData = data.length > 0 ? data : defaultData
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -64,7 +58,7 @@ export function RevenueChart() {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3} />

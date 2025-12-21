@@ -13,20 +13,12 @@ import {
   Cell
 } from 'recharts'
 
-const userGrowthData = [
-  { month: 'Jan', newUsers: 145, activeUsers: 1200 },
-  { month: 'Feb', newUsers: 178, activeUsers: 1350 },
-  { month: 'Mar', newUsers: 162, activeUsers: 1480 },
-  { month: 'Apr', newUsers: 195, activeUsers: 1650 },
-  { month: 'May', newUsers: 210, activeUsers: 1820 },
-  { month: 'Jun', newUsers: 188, activeUsers: 1950 },
-  { month: 'Jul', newUsers: 225, activeUsers: 2100 },
-  { month: 'Aug', newUsers: 198, activeUsers: 2250 },
-  { month: 'Sep', newUsers: 242, activeUsers: 2420 },
-  { month: 'Oct', newUsers: 268, activeUsers: 2650 },
-  { month: 'Nov', newUsers: 285, activeUsers: 2890 },
-  { month: 'Dec', newUsers: 312, activeUsers: 3150 }
-]
+// TODO: Fetch user growth data from database
+interface UserGrowthChartProps {
+  data?: Array<{ month: string; newUsers: number; activeUsers: number }>
+}
+
+const defaultData: Array<{ month: string; newUsers: number; activeUsers: number }> = []
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -44,7 +36,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-export function UserGrowthChart() {
+export function UserGrowthChart({ data = defaultData }: UserGrowthChartProps) {
+  const chartData = data.length > 0 ? data : defaultData
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -63,7 +57,7 @@ export function UserGrowthChart() {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={userGrowthData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="newUsersGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9} />
