@@ -1,6 +1,7 @@
 import { supabase, BlogPost, BlogPostCreate } from './supabase'
 
 export class BlogService {
+  static supabase: any
   // Lấy tất cả bài viết
   static async getAllPosts(): Promise<BlogPost[]> {
     try {
