@@ -1,366 +1,154 @@
 "use client"
 
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Plus, FolderOpen } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { Loader2, Save, FolderPlus, Upload, X } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 
-const createProjectSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters'),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
-  client: z.string().min(2, 'Client name is required'),
-  category: z.enum(['web', 'mobile', 'desktop', 'ai', 'blockchain'], {
-    required_error: 'Please select a category',
-  }),
-  status: z.enum(['planning', 'in-progress', 'completed', 'on-hold'], {
-    required_error: 'Please select a status',
-  }),
-  priority: z.enum(['low', 'medium', 'high'], {
-    required_error: 'Please select a priority level',
-  }),
-  budget: z.number().min(0, 'Budget must be 0 or greater'),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  teamSize: z.number().min(1, 'Team size must be at least 1'),
-  technologies: z.string().min(1, 'At least one technology is required'),
-  manager: z.string().min(2, 'Project manager name is required'),
-})
-
-type CreateProjectFormData = z.infer<typeof createProjectSchema>
-
-interface CreateProjectModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onCreateProject: (projectData: any) => void
-}
-
-export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateProjectModalProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<CreateProjectFormData>({
-    resolver: zodResolver(createProjectSchema),
-    defaultValues: {
-      status: 'planning',
-      priority: 'medium',
-      budget: 0,
-      teamSize: 1,
-    },
+export function CreateProjectModal({ isOpen, onClose, onSuccess }: any) {
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [mentors, setMentors] = useState<any[]>([])
+  const [formData, setFormData] = useState({
+    title: '', slug: '', category: 'Giáo dục', description: '', 
+    detailproject: '', image: '', status: 'ongoing', mentor_ids: [] as string[]
   })
 
-  const onSubmit = async (data: CreateProjectFormData) => {
-    setIsSubmitting(true)
-    try {
-      const projectData = {
-        ...data,
-        technologies: data.technologies.split(',').map(tech => tech.trim())
-      }
-      onCreateProject(projectData)
-      reset()
-      onClose()
-    } catch (error) {
-      console.error('Error creating project:', error)
-    } finally {
-      setIsSubmitting(false)
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from('profiles').select('id, full_name, avatar_url').eq('role', 'mentor')
+        .then(({ data }) => data && setMentors(data))
     }
+  }, [isOpen])
+
+  // Logic Upload Ảnh cho Dự án
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true)
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `project-thumbnails/${fileName}`
+
+      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file)
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('media').getPublicUrl(filePath)
+      setFormData({ ...formData, image: data.publicUrl })
+      toast({ title: "Tải ảnh thành công!" })
+    } catch (error: any) {
+      toast({ title: "Lỗi tải ảnh", description: error.message, variant: "destructive" })
+    } finally { setUploading(false) }
   }
 
-  const handleClose = () => {
-    reset()
-    onClose()
+  const handleSave = async () => {
+  if (!formData.title || !formData.slug) return toast({ title: "Thiếu tên hoặc slug" });
+  if (!formData.image) return toast({ title: "Thiếu ảnh dự án" });
+
+  setLoading(true);
+  
+  // CHỈ gửi những trường CÓ TRONG bảng projects bạn vừa liệt kê
+  const dataToInsert = {
+    title: formData.title,
+    slug: formData.slug,
+    category: formData.category, // Cột này đã có trong danh sách bạn gửi
+    description: formData.description,
+    detailproject: formData.detailproject,
+    image: formData.image,
+    status: formData.status,
+    mentor_ids: formData.mentor_ids || [], // Phải là mảng
+    featured: formData.featured || false
+  };
+
+  const { data, error } = await supabase
+    .from('projects')
+    .insert([dataToInsert])
+    .select();
+
+  if (error) {
+    console.error("Lỗi debug:", error);
+    // Nếu vẫn lỗi PGRST204, hãy đợi 30s sau khi chạy lệnh NOTIFY ở Bước 1
+    toast({ title: `Lỗi ${error.code}: ${error.message}`, variant: "destructive" });
+  } else {
+    onSuccess(data[0]);
+    onClose();
+    toast({ title: "Thành công!" });
   }
+  setLoading(false);
+};
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="backdrop-blur-xl bg-white/95 dark:bg-gray-800/95 border border-white/20 dark:border-gray-700/20 sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-white text-slate-900">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2 text-gray-900 dark:text-white">
-            <FolderOpen className="h-5 w-5" />
-            <span>Create New Project</span>
-          </DialogTitle>
+          <DialogTitle className="flex gap-2"><FolderPlus /> Tạo dự án mới</DialogTitle>
+          <DialogDescription>Dữ liệu hiển thị tại msc.edu.vn/du-an</DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="title" className="text-gray-900 dark:text-white">
-                Project Title
-              </Label>
-              <Input
-                id="title"
-                {...register('title')}
-                placeholder="Enter project title"
-                className={errors.title ? 'border-red-500' : ''}
-              />
-              {errors.title && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.title.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description" className="text-gray-900 dark:text-white">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                {...register('description')}
-                placeholder="Enter project description"
-                rows={3}
-                className={errors.description ? 'border-red-500' : ''}
-              />
-              {errors.description && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.description.message}
-                </p>
-              )}
-            </div>
-
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-4">
+          <div className="md:col-span-2 space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="client" className="text-gray-900 dark:text-white">
-                Client Name
-              </Label>
-              <Input
-                id="client"
-                {...register('client')}
-                placeholder="Client or company name"
-                className={errors.client ? 'border-red-500' : ''}
-              />
-              {errors.client && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.client.message}
-                </p>
-              )}
+              <Label className="font-bold">Tên dự án</Label>
+              <Input value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value, slug: e.target.value.toLowerCase().replace(/ /g, '-')})} placeholder="VD: Einstein School HCM" />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="manager" className="text-gray-900 dark:text-white">
-                Project Manager
-              </Label>
-              <Input
-                id="manager"
-                {...register('manager')}
-                placeholder="Project manager name"
-                className={errors.manager ? 'border-red-500' : ''}
-              />
-              {errors.manager && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.manager.message}
-                </p>
-              )}
+              <Label className="font-bold">Mô tả ngắn</Label>
+              <Textarea rows={3} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="Tóm tắt dự án..." />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="category" className="text-gray-900 dark:text-white">
-                Category
-              </Label>
-              <Select onValueChange={(value) => setValue('category', value as any)}>
-                <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent className="backdrop-blur-xl bg-white/95 dark:bg-gray-800/95">
-                  <SelectItem value="web">Web Development</SelectItem>
-                  <SelectItem value="mobile">Mobile App</SelectItem>
-                  <SelectItem value="desktop">Desktop Application</SelectItem>
-                  <SelectItem value="ai">AI/Machine Learning</SelectItem>
-                  <SelectItem value="blockchain">Blockchain</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.category && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.category.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="priority" className="text-gray-900 dark:text-white">
-                Priority Level
-              </Label>
-              <Select onValueChange={(value) => setValue('priority', value as any)} defaultValue="medium">
-                <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent className="backdrop-blur-xl bg-white/95 dark:bg-gray-800/95">
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.priority && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.priority.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status" className="text-gray-900 dark:text-white">
-                Status
-              </Label>
-              <Select onValueChange={(value) => setValue('status', value as any)} defaultValue="planning">
-                <SelectTrigger className={errors.status ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent className="backdrop-blur-xl bg-white/95 dark:bg-gray-800/95">
-                  <SelectItem value="planning">Planning</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="on-hold">On Hold</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.status && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.status.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="budget" className="text-gray-900 dark:text-white">
-                Budget ($)
-              </Label>
-              <Input
-                id="budget"
-                type="number"
-                min="0"
-                step="1000"
-                {...register('budget', { valueAsNumber: true })}
-                placeholder="0"
-                className={errors.budget ? 'border-red-500' : ''}
-              />
-              {errors.budget && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.budget.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="teamSize" className="text-gray-900 dark:text-white">
-                Team Size
-              </Label>
-              <Input
-                id="teamSize"
-                type="number"
-                min="1"
-                {...register('teamSize', { valueAsNumber: true })}
-                placeholder="1"
-                className={errors.teamSize ? 'border-red-500' : ''}
-              />
-              {errors.teamSize && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.teamSize.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="startDate" className="text-gray-900 dark:text-white">
-                Start Date
-              </Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...register('startDate')}
-                className={errors.startDate ? 'border-red-500' : ''}
-              />
-              {errors.startDate && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.startDate.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="endDate" className="text-gray-900 dark:text-white">
-                End Date
-              </Label>
-              <Input
-                id="endDate"
-                type="date"
-                {...register('endDate')}
-                className={errors.endDate ? 'border-red-500' : ''}
-              />
-              {errors.endDate && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.endDate.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="technologies" className="text-gray-900 dark:text-white">
-                Technologies
-              </Label>
-              <Input
-                id="technologies"
-                {...register('technologies')}
-                placeholder="React, Node.js, PostgreSQL (comma separated)"
-                className={errors.technologies ? 'border-red-500' : ''}
-              />
-              {errors.technologies && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.technologies.message}
-                </p>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Separate multiple technologies with commas
-              </p>
+              <Label className="font-bold text-blue-600">Nội dung chi tiết (Markdown)</Label>
+              <Textarea className="min-h-[400px] font-mono" value={formData.detailproject} onChange={(e) => setFormData({...formData, detailproject: e.target.value})} placeholder="Viết chi tiết dự án..." />
             </div>
           </div>
 
-          <DialogFooter className="flex items-center space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-primary-600 hover:bg-primary-700"
-            >
-              {isSubmitting ? (
-                <>Creating...</>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Project
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+          <div className="bg-slate-50 p-6 rounded-xl border space-y-6">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase">Ảnh bìa dự án</Label>
+              <div className="relative border-2 border-dashed rounded-lg p-4 bg-white flex flex-col items-center justify-center min-h-[160px]">
+                {formData.image ? (
+                  <div className="relative w-full aspect-video">
+                    <img src={formData.image} className="w-full h-full object-cover rounded-md" />
+                    <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => setFormData({...formData, image: ''})}><X size={12} /></Button>
+                  </div>
+                ) : (
+                  <label className="cursor-pointer text-center">
+                    {uploading ? <Loader2 className="animate-spin mx-auto" /> : <Upload className="mx-auto text-slate-400" />}
+                    <span className="text-sm block mt-2">Tải ảnh lên</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase">Mentor Phụ trách</Label>
+              <div className="grid gap-2 max-h-48 overflow-y-auto pr-2">
+                {mentors.map(m => (
+                  <div key={m.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${formData.mentor_ids.includes(m.id) ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}
+                    onClick={() => setFormData({...formData, mentor_ids: formData.mentor_ids.includes(m.id) ? formData.mentor_ids.filter(id => id !== m.id) : [...formData.mentor_ids, m.id]})}>
+                    <Avatar className="h-6 w-6"><AvatarImage src={m.avatar_url}/></Avatar>
+                    <span className="text-xs font-medium">{m.full_name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="border-t pt-4">
+          <Button variant="outline" onClick={onClose}>Hủy</Button>
+          <Button disabled={loading || uploading} className="bg-blue-600" onClick={handleSave}>
+            {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />} Tạo dự án
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
