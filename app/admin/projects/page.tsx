@@ -1,196 +1,258 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ProtectedRoute } from '@/components/admin/ProtectedRoute'
 import { ProjectsTable } from '@/components/admin/projects/ProjectsTable'
 import { CreateProjectModal } from '@/components/admin/projects/CreateProjectModal'
+import { EditProjectModal } from '@/components/admin/projects/EditProjectModal'
+import { DeleteProjectModal } from '@/components/admin/projects/DeleteProjectModal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Search, FolderOpen, Briefcase, Clock, DollarSign } from 'lucide-react'
+import { 
+  Plus, Search, FolderOpen, Loader2, RefreshCcw, 
+  ChevronLeft, ChevronRight, Filter, AlertCircle 
+} from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 
-// TODO: Fetch real project data from database
-const initialProjects: Array<any> = []
+const ITEMS_PER_PAGE = 8; // Số dự án trên mỗi trang
 
 function ProjectsManagementContent() {
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  // States cho Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<any>(null)
+  const [deletingProject, setDeletingProject] = useState<any>(null)
 
-  const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.manager.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // 1. Hàm lấy dữ liệu có Phân trang (Pagination)
+  const fetchProjects = useCallback(async (page = 1, silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      else setIsRefreshing(true);
 
-  const handleCreateProject = (projectData: any) => {
-    const nextId = projects.length > 0 ? Math.max(...projects.map(p => p.id)) + 1 : 1
-    const newProject = {
-      id: nextId,
-      ...projectData,
-      spent: 0,
-      progress: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0]
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      // Query lấy dữ liệu và tổng số dòng cùng lúc
+      const { data, error, count } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      
+      setProjects(data || []);
+      if (count !== null) setTotalCount(count);
+    } catch (error: any) {
+      toast({ title: "Lỗi tải dữ liệu", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
-    setProjects([...projects, newProject])
-    setIsCreateModalOpen(false)
-  }
+  }, []);
 
-  const handleUpdateProject = (updatedProject: any) => {
-    setProjects(projects.map(project => 
-      project.id === updatedProject.id ? { ...updatedProject, updatedAt: new Date().toISOString().split('T')[0] } : project
-    ))
-  }
+  useEffect(() => {
+    fetchProjects(currentPage);
+  }, [currentPage, fetchProjects]);
 
-  const handleDeleteProject = (projectId: number) => {
-    setProjects(projects.filter(project => project.id !== projectId))
-  }
+  // 2. Xử lý Chuyển trang
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
 
-  const projectStats = {
-    total: projects.length,
-    active: projects.filter(p => p.status === 'in-progress').length,
-    completed: projects.filter(p => p.status === 'completed').length,
-    planning: projects.filter(p => p.status === 'planning').length,
-    onHold: projects.filter(p => p.status === 'on-hold').length,
-    totalBudget: projects.reduce((acc, project) => acc + project.budget, 0),
-    totalSpent: projects.reduce((acc, project) => acc + project.spent, 0),
-    avgProgress: projects.length > 0 ? Math.round(projects.reduce((acc, project) => acc + project.progress, 0) / projects.length) : 0
+  // 3. Logic tìm kiếm (Client-side cho trang hiện tại)
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p =>
+      p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [projects, searchTerm]);
+
+  // 4. CRUD Callbacks - Đảm bảo đồng bộ DB
+  const handleCreateSuccess = () => {
+    fetchProjects(1); // Reset về trang 1 để xem project mới nhất
+    setIsCreateModalOpen(false);
+    toast({ title: "Thành công", description: "Dự án mới đã được lưu vào hệ thống." });
+  };
+
+  const handleUpdateSuccess = (updatedProject: any) => {
+    if (!updatedProject || !updatedProject.id) {
+    console.error("Dữ liệu cập nhật bị thiếu:", updatedProject);
+    return;
   }
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    setEditingProject(null);
+    toast({ title: "Đã cập nhật", description: "Thông tin thay đổi đã được áp dụng." });
+  };
+
+  const handleDeleteConfirm = async (id: string) => {
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) throw error;
+      
+      toast({ title: "Đã xóa", description: "Dự án đã được loại bỏ." });
+      // Nếu xóa xong trang hiện tại trống thì lùi về 1 trang
+      if (projects.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        fetchProjects(currentPage, true);
+      }
+      setDeletingProject(null);
+    } catch (error: any) {
+      toast({ title: "Lỗi khi xóa", description: error.message, variant: "destructive" });
+    }
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Track and manage all your client projects, budgets, and team assignments.
-          </p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Dự án & Đối tác</h1>
+          <p className="text-slate-500 text-sm mt-1">Quản lý danh mục và đội ngũ chuyên gia Mentor</p>
         </div>
-        <Button 
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-primary-600 hover:bg-primary-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Project
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => fetchProjects(currentPage, true)} disabled={isRefreshing}>
+            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-6">
+            <Plus className="h-5 w-5 mr-2" /> Tạo dự án
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20 md:col-span-2">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Projects</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{projectStats.total}</p>
-              </div>
-              <FolderOpen className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-              <p className="text-xl font-bold text-green-600">{projectStats.active}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
-              <p className="text-xl font-bold text-blue-600">{projectStats.completed}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Planning</p>
-              <p className="text-xl font-bold text-yellow-600">{projectStats.planning}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">On Hold</p>
-              <p className="text-xl font-bold text-red-600">{projectStats.onHold}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Budget</p>
-              <p className="text-xl font-bold text-purple-600">${(projectStats.totalBudget / 1000).toFixed(0)}K</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Progress</p>
-              <p className="text-xl font-bold text-orange-600">{projectStats.avgProgress}%</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <Card className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 border border-white/20 dark:border-gray-700/20">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-            Project Portfolio
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search projects by title, client, category, status, or manager..."
+      {/* Main Content */}
+      <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
+        <CardHeader className="border-b border-slate-50 px-8 py-6">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Tìm tên dự án, danh mục..." 
+                className="pl-10 bg-slate-50 border-none rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">{filteredProjects.length} projects</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="px-4 py-1.5 rounded-lg border-slate-200 text-slate-600">
+                Tổng: {totalCount} dự án
+              </Badge>
             </div>
           </div>
+        </CardHeader>
 
-          <ProjectsTable 
-            projects={filteredProjects}
-            onUpdateProject={handleUpdateProject}
-            onDeleteProject={handleDeleteProject}
-          />
+        <CardContent className="p-0">
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <div className="py-40 flex flex-col items-center justify-center">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-slate-400 mt-4 font-medium italic">Đang tải dữ liệu...</p>
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="py-40 text-center">
+                <AlertCircle className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">Không tìm thấy dữ liệu phù hợp</p>
+              </div>
+            ) : (
+              <ProjectsTable 
+  projects={filteredProjects}
+  onEdit={setEditingProject}
+  onDelete={setDeletingProject}
+  currentPage={currentPage}
+  itemsPerPage={ITEMS_PER_PAGE}
+/>
+            )}
+          </AnimatePresence>
         </CardContent>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="px-8 py-6 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
+            <p className="text-sm text-slate-500">
+              Trang <strong>{currentPage}</strong> / {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                className="rounded-lg"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Trước
+              </Button>
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, i) => (
+                  <Button
+                    key={i}
+                    variant={currentPage === i + 1 ? "default" : "ghost"}
+                    size="sm"
+                    className="w-8 h-8 p-0 rounded-md"
+                    onClick={() => handlePageChange(i + 1)}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+                className="rounded-lg"
+              >
+                Sau <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
-      <CreateProjectModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreateProject={handleCreateProject}
+      {/* Modals */}
+      <CreateProjectModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onSuccess={handleCreateSuccess} 
       />
+
+      {editingProject && (
+        <EditProjectModal 
+          isOpen={!!editingProject} 
+          project={editingProject} 
+          onClose={() => setEditingProject(null)} 
+          onSuccess={handleUpdateSuccess} 
+        />
+      )}
+
+      {deletingProject && (
+        <DeleteProjectModal 
+          isOpen={!!deletingProject} 
+          project={deletingProject} 
+          onClose={() => setDeletingProject(null)} 
+          onDelete={handleDeleteConfirm} 
+        />
+      )}
     </div>
   )
 }
 
 export default function ProjectsManagementPage() {
   return (
-    <ProtectedRoute allowedRoles={['admin', 'editor']}>
+    <ProtectedRoute allowedRoles={['admin', 'collab']}>
       <ProjectsManagementContent />
     </ProtectedRoute>
   )
