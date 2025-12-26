@@ -20,12 +20,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <div className="fixed inset-0 bg-gradient-to-br from-white/40 via-blue-50/30 to-indigo-100/40 dark:from-gray-900/40 dark:via-slate-800/30 dark:to-indigo-900/40 backdrop-blur-3xl pointer-events-none" />
       
       <div className="relative flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <AdminSidebar 
+        {/* Sidebar 
+         <AdminSidebar 
           isOpen={sidebarOpen}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
+*/}
+        
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">

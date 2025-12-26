@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
+import { title } from 'process'
 
 interface AdminSidebarProps {
   isOpen: boolean
@@ -36,25 +37,25 @@ const adminMenuItems = [
     title: 'Quản lý người dùng',
     href: '/admin/users',
     icon: Users,
-    roles: ['admin']
+    roles: ['admin', 'collab']
   },
   {
     title: 'Tài chính',
     href: '/admin/finance',
     icon: DollarSign,
-    roles: ['admin']
+    roles: ['admin', 'collab']
   },
   {
     title: 'Khóa học',
     href: '/admin/courses',
     icon: BookOpen,
-    roles: ['admin']
+    roles: ['admin', 'collab']
   },
   {
     title: 'Dự án',
     href: '/admin/projects',
     icon: FolderOpen,
-    roles: ['admin']
+    roles: ['admin', 'collab']
   },
   {
     title: 'Bài viết',
@@ -68,11 +69,18 @@ const adminMenuItems = [
     icon: Image,
     roles: ['admin', 'collab']
   },
+ // Trong file AdminSidebar.tsx, thêm item mới vào adminMenuItems
+{
+  title: 'Quản lý Mentor',
+  href: '/admin/mentors',
+  icon: Users, // Dùng icon Users từ lucide-react
+  roles: ['admin', 'collab']
+},
   {
     title: 'Cài đặt',
     href: '/admin/settings',
     icon: Settings,
-    roles: ['admin']
+    roles: ['admin', 'collab']
   }
 ]
 
