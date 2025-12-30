@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
-import { Loader2, Save, Edit, Upload, X, Star } from 'lucide-react'
+import { Avatar, AvatarImage , AvatarFallback} from '@/components/ui/avatar'
+import { Loader2, Save, Edit, Upload, X, Star, Users } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 export function EditProjectModal({ isOpen, onClose, project, onSuccess }: any) {
@@ -28,9 +28,9 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: any) {
       })
       
       // Load danh sách mentor để chọn
-      supabase.from('profiles')
+      supabase.from('mentors')
         .select('id, full_name, avatar_url')
-        .eq('role', 'mentor')
+        //.eq('role', 'mentor')
         .then(({ data }) => data && setMentors(data))
     }
   }, [project, isOpen])
@@ -193,21 +193,55 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: any) {
               </div>
 
               <div className="space-y-2">
-                <Label className="font-bold text-slate-500 uppercase text-[10px]">Đội ngũ Mentor tham gia</Label>
-                <div className="grid gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar border bg-white p-2 rounded-lg">
-                  {mentors.map(m => (
-                    <div key={m.id} className={`flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer ${formData.mentor_ids?.includes(m.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-100'}`}
-                      onClick={() => {
-                        const ids = formData.mentor_ids || []
-                        const nextIds = ids.includes(m.id) ? ids.filter((id:any) => id !== m.id) : [...ids, m.id]
-                        setFormData({...formData, mentor_ids: nextIds})
-                      }}>
-                      <Avatar className="h-7 w-7 border shadow-sm"><AvatarImage src={m.avatar_url}/></Avatar>
-                      <span className="text-xs font-semibold">{m.full_name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+  <Label className="font-bold text-slate-500 uppercase text-[10px] tracking-widest flex items-center gap-2">
+    <Users className="h-3 w-3" /> Đội ngũ Mentor tham gia
+  </Label>
+  
+  <div className="grid gap-1.5 max-h-56 overflow-y-auto pr-2 custom-scrollbar border border-slate-100 bg-white p-2 rounded-xl shadow-inner">
+    {mentors.map(m => {
+      const isSelected = formData.mentor_ids?.includes(m.id);
+      return (
+        <div 
+          key={m.id} 
+          className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer group ${
+            isSelected 
+            ? 'bg-blue-50 border-blue-200 shadow-sm' 
+            : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
+          }`}
+          onClick={() => {
+            const ids = formData.mentor_ids || []
+            const nextIds = isSelected 
+              ? ids.filter((id: any) => id !== m.id) 
+              : [...ids, m.id]
+            setFormData({...formData, mentor_ids: nextIds})
+          }}
+        >
+          <div className="flex items-center gap-2.5">
+            <Avatar className="h-6 w-6 border-2 border-white shadow-sm shrink-0">
+              <AvatarImage src={m.avatar_url} className="object-cover" />
+              <AvatarFallback className="text-[8px] bg-slate-100 uppercase">
+                {m.full_name?.substring(0, 2)}
+              </AvatarFallback>
+            </Avatar>
+            <span className={`text-[11px] font-medium transition-colors ${
+              isSelected ? 'text-blue-700 font-bold' : 'text-slate-600'
+            }`}>
+              {m.full_name}
+            </span>
+          </div>
+          
+          {/* Badge trạng thái chọn */}
+          <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-all ${
+            isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-200 group-hover:border-slate-300'
+          }`}>
+            {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+  <p className="text-[9px] text-slate-400 italic">Nhấp để chọn hoặc bỏ chọn chuyên gia tham gia dự án.</p>
+</div>
 
               {/* DỰ ÁN TIÊU BIỂU (FEATURED) */}
               <div 
