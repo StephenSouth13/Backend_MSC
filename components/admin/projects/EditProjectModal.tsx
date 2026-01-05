@@ -147,9 +147,38 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: any) {
             </div>
 
             <div className="space-y-2">
-              <Label className="font-bold text-blue-600 uppercase text-xs">Mô tả ngắn (Hiển thị ở trang danh sách)</Label>
-              <Textarea rows={3} className="border-slate-200" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
-            </div>
+  <Label className="font-bold text-slate-500 uppercase text-[10px] tracking-widest flex justify-between">
+    Lĩnh vực (Category)
+    <span className="text-blue-500 lowercase font-normal italic">Tự nhập tay</span>
+  </Label>
+  
+  {/* Thay Select bằng Input để gõ tay */}
+  <Input 
+    className="bg-white border-slate-200" 
+    placeholder="VD: Chuyển đổi số, Kỹ năng mềm..."
+    value={formData.category}
+    onChange={(e) => setFormData({...formData, category: e.target.value})}
+  />
+
+  {/* CÁC NÚT GỢI Ý NHANH ĐỂ BẤM CHO NHANH */}
+  <div className="flex flex-wrap gap-1.5 mt-2">
+    {['Giáo dục', 'Công nghệ', 'Đào tạo', 'Khởi nghiệp', 'Y tế'].map((suggest) => (
+      <button
+        key={suggest}
+        type="button"
+        className={`text-[10px] px-2 py-1 rounded-md border transition-all ${
+          formData.category === suggest 
+            ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+        }`}
+        onClick={() => setFormData({...formData, category: suggest})}
+      >
+        {suggest}
+      </button>
+    ))}
+  </div>
+  <p className="text-[9px] text-slate-400 italic">Bạn có thể gõ bất kỳ lĩnh vực nào hoặc chọn từ gợi ý.</p>
+</div>
 
             <div className="space-y-2">
               <Label className="font-bold text-blue-600 uppercase text-xs">Nội dung chi tiết (Markdown)</Label>

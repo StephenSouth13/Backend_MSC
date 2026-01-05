@@ -20,7 +20,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: any) {
   const [formData, setFormData] = useState({
     title: '', 
     slug: '', 
-    category: 'Giáo dục', 
+    category: '', // Để trống để người dùng tự nhập
     description: '', 
     detailproject: '', 
     image: '', 
@@ -191,16 +191,32 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: any) {
               </div>
 
               <div className="space-y-2">
-                <Label className="font-bold text-slate-500 uppercase text-[10px]">Lĩnh vực</Label>
-                <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-                  <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Giáo dục">Giáo dục</SelectItem>
-                    <SelectItem value="Công nghệ">Công nghệ</SelectItem>
-                    <SelectItem value="Đào tạo">Đào tạo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+  <Label className="font-bold text-slate-500 uppercase text-[10px] tracking-widest flex justify-between">
+    Lĩnh vực (Category)
+    <span className="text-blue-500 lowercase font-normal italic">Tự nhập tay</span>
+  </Label>
+  
+  <Input 
+    className="bg-white border-slate-200" 
+    placeholder="VD: Chuyển đổi số, Kỹ năng mềm..."
+    value={formData.category}
+    onChange={(e) => setFormData({...formData, category: e.target.value})}
+  />
+
+  {/* GỢI Ý NHANH (Bấm vào là điền luôn) */}
+  <div className="flex flex-wrap gap-1 mt-2">
+    {['Giáo dục', 'Công nghệ', 'Đào tạo', 'Khởi nghiệp'].map((suggest) => (
+      <button
+        key={suggest}
+        type="button"
+        className="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-blue-100 text-slate-600 transition-colors"
+        onClick={() => setFormData({...formData, category: suggest})}
+      >
+        +{suggest}
+      </button>
+    ))}
+  </div>
+</div>
 
               <div className="space-y-2">
                 <Label className="font-bold text-slate-500 uppercase text-[10px]">Mentor phụ trách</Label>
