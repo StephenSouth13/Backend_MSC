@@ -1,3 +1,4 @@
+//D:\MSC\Backend_MSC\app\admin\articles\page.tsx
 "use client"
 
 import { useState, useEffect } from 'react'

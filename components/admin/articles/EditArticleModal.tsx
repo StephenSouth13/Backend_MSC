@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
-import { X, ImageIcon, Loader2, Save, Edit3, Upload } from 'lucide-react'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { X, ImageIcon, Loader2, Save, Edit3, Upload, Video, Youtube, CheckCircle2, Globe } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 export function EditArticleModal({ open, onClose, article, onUpdateArticle }: any) {
@@ -19,57 +19,47 @@ export function EditArticleModal({ open, onClose, article, onUpdateArticle }: an
   const contentRef = useRef<HTMLTextAreaElement>(null)
   const [formData, setFormData] = useState<any>(null)
 
-  // Đồng bộ dữ liệu bài viết vào Form
   useEffect(() => {
     if (article && open) {
-      setFormData({ ...article })
-      // Load danh sách thành viên làm tác giả
-      supabase.from('profiles')
-        .select('id, full_name, avatar_url, role')
-        .in('role', ['mentor', 'mscer'])
-        .then(({ data }) => data && setMembers(data))
+      setFormData({ 
+        ...article,
+        author_ids: article.author_ids || (article.author_id ? [article.author_id] : [])
+      })
+      supabase.from('mentors').select('id, full_name, avatar_url').then(({ data }) => data && setMembers(data))
     }
   }, [article, open])
 
-  // Xử lý Upload Ảnh (Thumbnail hoặc chèn vào Content)
-  const uploadImage = async (e: React.ChangeEvent<HTMLInputElement>, folder: string) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(folder)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}.${fileExt}`
-      const path = `blog/${folder}/${fileName}`
-
-      const { error: uploadError } = await supabase.storage.from('media').upload(path, file)
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
-
-      if (folder === 'thumbnails') {
-        setFormData((prev: any) => ({ ...prev, image: publicUrl }))
-      } else {
-        // Chèn ảnh vào vị trí con trỏ trong Textarea
-        const insertText = `\n![Hình ảnh](${publicUrl})\n`
-        const textarea = contentRef.current
-        if (textarea) {
-          const start = textarea.selectionStart
-          const end = textarea.selectionEnd
-          const currentContent = formData.content || ""
-          const newContent = currentContent.substring(0, start) + insertText + currentContent.substring(end)
-          setFormData((prev: any) => ({ ...prev, content: newContent }))
-        }
-      }
-      toast({ title: "Tải ảnh thành công!" })
-    } catch (err: any) {
-      toast({ title: "Lỗi tải ảnh", description: err.message, variant: "destructive" })
-    } finally {
-      setUploading(null)
+  const insertAtCursor = (text: string) => {
+    const textarea = contentRef.current
+    if (textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newContent = (formData.content || "").substring(0, start) + text + (formData.content || "").substring(end)
+      setFormData((prev: any) => ({ ...prev, content: newContent }))
+      setTimeout(() => { textarea.focus(); textarea.setSelectionRange(start + text.length, start + text.length) }, 10)
     }
   }
 
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'thumbnails' | 'image-content' | 'video-content') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(target)
+    try {
+      const path = `${target.includes('video') ? 'videos' : 'blog'}/${Date.now()}_${file.name}`
+      const { error: uploadError } = await supabase.storage.from('media').upload(path, file)
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
+
+      if (target === 'thumbnails') setFormData((p: any) => ({ ...p, image: publicUrl }))
+      else if (target === 'image-content') insertAtCursor(`\n![Mô tả](${publicUrl})\n`)
+      else insertAtCursor(`\n<video controls className="w-full rounded-2xl my-4 shadow-lg"><source src="${publicUrl}" type="video/mp4" /></video>\n`)
+      toast({ title: "Tải lên thành công!" })
+    } catch (err: any) { toast({ title: "Lỗi tải lên", variant: "destructive" }) }
+    finally { setUploading(null) }
+  }
+
   const handleSave = async () => {
-    if (!formData.title) return toast({ title: "Tiêu đề không được để trống" })
+    if (!formData.title) return toast({ title: "Thiếu tiêu đề bài viết" })
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -77,154 +67,106 @@ export function EditArticleModal({ open, onClose, article, onUpdateArticle }: an
         .update({
           title: formData.title,
           content: formData.content,
+          excerpt: formData.excerpt,
           image: formData.image,
-          author_id: formData.author_id,
+          author_ids: formData.author_ids,
           category: formData.category,
-          status: formData.status
-          // Thêm các trường khác của bạn ở đây
+          status: 'published', // Ép về published khi nhấn Save
+          updated_at: new Date().toISOString(),
+          published_at: article.published_at || new Date().toISOString()
         })
-        .eq('id', article.id)
-        .select()
+        .eq('id', article.id).select()
 
       if (error) throw error
-
-      // Nếu Supabase trả về data thành công, dùng data[0], nếu không dùng formData hiện tại
-      const updatedData = (data && data.length > 0) ? data[0] : formData
-      
-      onUpdateArticle(updatedData)
-      toast({ title: "Cập nhật bài viết thành công!" })
+      onUpdateArticle(data?.[0] || formData)
+      toast({ title: "Đã xuất bản bài viết thành công!" })
       onClose()
-    } catch (err: any) {
-      console.error("Update error:", err)
-      toast({ title: "Lỗi cập nhật", description: err.message, variant: "destructive" })
-    } finally {
-      setLoading(false)
-    }
+    } catch (err: any) { toast({ title: "Lỗi", description: err.message, variant: "destructive" }) }
+    finally { setLoading(false) }
   }
 
   if (!formData) return null
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0 bg-white text-slate-900 border-none shadow-2xl">
-        {/* Header Thanh công cụ */}
-        <div className="bg-blue-600 p-5 text-white flex justify-between items-center sticky top-0 z-50 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <Edit3 size={20} />
-            </div>
+      <DialogContent className="max-w-[95vw] lg:max-w-7xl max-h-[96vh] overflow-y-auto p-0 bg-white border-none shadow-2xl rounded-[2rem]">
+        {/* TOP BAR NHƯ MỘT EDITOR CHUYÊN NGHIỆP */}
+        <div className="bg-slate-900 p-5 text-white flex justify-between items-center sticky top-0 z-50">
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20"><Edit3 size={22} /></div>
             <div>
-              <h2 className="font-bold text-lg leading-none">Chỉnh sửa bài viết</h2>
-              <p className="text-blue-100 text-xs mt-1">ID: {article.id}</p>
+              <h2 className="font-black text-lg leading-none uppercase tracking-tighter">MSC Publisher Pro</h2>
+              <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-1"><Globe size={10}/> ĐANG CHỈNH SỬA CÔNG KHAI</p>
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" className="text-white hover:bg-white/10" onClick={onClose}>Hủy</Button>
-            <Button disabled={loading} className="bg-white text-blue-600 font-bold hover:bg-blue-50" onClick={handleSave}>
-              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Lưu thay đổi
+            <Button variant="ghost" className="text-slate-400 hover:text-white font-bold" onClick={onClose}>Hủy bỏ</Button>
+            <Button disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-10 rounded-full h-12 shadow-xl shadow-blue-500/30" onClick={handleSave}>
+              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CheckCircle2 className="mr-2 h-4 w-4" />} XÁC NHẬN XUẤT BẢN
             </Button>
           </div>
         </div>
 
-        <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cột trái: Soạn thảo */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="space-y-2">
-              <Label className="font-bold text-slate-700">Tiêu đề bài viết</Label>
-              <Input 
-                className="text-xl font-bold py-6 border-slate-200 focus:border-blue-500 focus:ring-blue-500" 
-                placeholder="Nhập tiêu đề..."
-                value={formData.title} 
-                onChange={(e) => setFormData({...formData, title: e.target.value})} 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-bold text-slate-700">Nội dung bài viết (Markdown)</Label>
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="flex gap-2 p-2 bg-slate-50 border-b border-slate-200">
-                  <Button variant="outline" size="sm" className="relative bg-white text-slate-600 h-8">
-                    <ImageIcon size={14} className="mr-2" /> 
-                    {uploading === 'content' ? 'Đang tải...' : 'Chèn ảnh vào nội dung'}
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => uploadImage(e, 'content')} />
-                  </Button>
-                </div>
-                <Textarea 
-                  ref={contentRef} 
-                  className="min-h-[500px] border-none focus:ring-0 text-base leading-relaxed p-4" 
-                  placeholder="Bắt đầu viết nội dung tại đây..."
-                  value={formData.content} 
-                  onChange={(e) => setFormData({...formData, content: e.target.value})} 
-                />
+        <div className="p-10 grid grid-cols-1 lg:grid-cols-4 gap-12">
+          {/* EDITOR SECTION */}
+          <div className="lg:col-span-3 space-y-8">
+            <Input className="text-5xl font-black py-16 border-none bg-transparent focus-visible:ring-0 placeholder:text-slate-100" placeholder="Tiêu đề bài viết..." value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+            
+            <div className="space-y-4">
+              <div className="flex gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <Button variant="outline" size="sm" className="relative bg-white font-bold text-[10px] h-10 px-4 rounded-xl shadow-sm hover:border-blue-500">
+                  <ImageIcon size={16} className="mr-2 text-blue-500" /> CHÈN ẢNH
+                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => handleUpload(e, 'image-content')} />
+                </Button>
+                <Button variant="outline" size="sm" className="relative bg-white font-bold text-[10px] h-10 px-4 rounded-xl shadow-sm hover:border-purple-500">
+                  <Video size={16} className="mr-2 text-purple-500" /> TẢI VIDEO
+                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="video/*" onChange={(e) => handleUpload(e, 'video-content')} />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => {const url = prompt("Link Youtube:"); if(url) insertAtCursor(`\n<iframe src="https://www.youtube.com/embed/${url.split('v=')[1]}" className="w-full aspect-video rounded-3xl my-6" allowFullScreen></iframe>\n`)}} className="bg-white font-bold text-[10px] h-10 px-4 rounded-xl shadow-sm hover:border-red-500">
+                  <Youtube size={16} className="mr-2 text-red-500" /> YOUTUBE
+                </Button>
               </div>
+              <Textarea ref={contentRef} className="min-h-[700px] border-none focus:ring-0 text-xl leading-relaxed p-8 font-serif bg-slate-50/30 rounded-[2rem] shadow-inner" placeholder="Bắt đầu câu chuyện..." value={formData.content} onChange={(e) => setFormData({...formData, content: e.target.value})} />
             </div>
           </div>
 
-          {/* Cột phải: Cài đặt */}
-          <aside className="space-y-6">
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-6">
-              <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-widest text-slate-500">Ảnh đại diện bài viết</Label>
-                <div className="relative aspect-video bg-slate-200 rounded-xl flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors group">
+          {/* SETTINGS SECTION */}
+          <aside className="space-y-8">
+            <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 space-y-8 sticky top-32">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ảnh đại diện bài viết</Label>
+                <div className="relative aspect-[4/3] bg-white rounded-[2rem] flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-200 group shadow-sm">
                   {formData.image ? (
                     <>
-                      <img src={formData.image} className="w-full h-full object-cover" alt="Thumbnail" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <label className="bg-white text-slate-900 px-4 py-2 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-50">
-                          ĐỔI ẢNH
-                          <input type="file" className="hidden" onChange={(e) => uploadImage(e, 'thumbnails')} />
-                        </label>
-                      </div>
+                      <img src={formData.image} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt="Thumb" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><label className="bg-white text-blue-600 px-6 py-2 rounded-full text-[10px] font-black cursor-pointer shadow-2xl hover:scale-110 transition-all">ĐỔI ẢNH<input type="file" className="hidden" accept="image/*" onChange={(e) => handleUpload(e, 'thumbnails')} /></label></div>
                     </>
                   ) : (
-                    <label className="cursor-pointer flex flex-col items-center gap-2">
-                      <div className="bg-white p-3 rounded-full shadow-sm text-slate-400">
-                        <Upload size={20} />
-                      </div>
-                      <span className="text-xs font-medium text-slate-500">Tải ảnh lên</span>
-                      <input type="file" className="hidden" onChange={(e) => uploadImage(e, 'thumbnails')} />
-                    </label>
-                  )}
-                  {uploading === 'thumbnails' && (
-                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                      <Loader2 className="animate-spin text-blue-600" />
-                    </div>
+                    <label className="cursor-pointer flex flex-col items-center gap-3">{uploading === 'thumbnails' ? <Loader2 className="animate-spin text-blue-600" /> : <Upload size={32} className="text-slate-300" />}<span className="text-[10px] font-black text-slate-400 tracking-tighter">TẢI LÊN THUMBNAIL</span><input type="file" className="hidden" accept="image/*" onChange={(e) => handleUpload(e, 'thumbnails')} /></label>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-slate-200">
-                <Label className="text-xs font-black uppercase tracking-widest text-slate-500">Tác giả bài viết</Label>
-                <Select value={formData.author_id} onValueChange={(id) => setFormData({...formData, author_id: id})}>
-                  <SelectTrigger className="bg-white border-slate-200 h-11">
-                    <SelectValue placeholder="Chọn tác giả" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-5 w-5">
-                            <AvatarImage src={m.avatar_url} />
-                          </Avatar>
-                          {m.full_name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Nhóm tác giả (Đa người viết)</Label>
+                <div className="grid gap-2 max-h-60 overflow-y-auto pr-2">
+                  {members.map(m => (
+                    <div key={m.id} onClick={() => { const current = formData.author_ids || []; const next = current.includes(m.id) ? current.filter((id:any) => id !== m.id) : [...current, m.id]; setFormData({...formData, author_ids: next})}} className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${formData.author_ids?.includes(m.id) ? 'border-blue-600 bg-blue-50/50 shadow-md scale-[1.02]' : 'border-transparent bg-white hover:bg-slate-100'}`}>
+                      <Avatar className="h-8 w-8 shadow-sm"><AvatarImage src={m.avatar_url} className="object-cover" /><AvatarFallback>{m.full_name?.charAt(0)}</AvatarFallback></Avatar>
+                      <span className="text-xs font-black text-slate-700 leading-none">{m.full_name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-slate-200">
-                <Label className="text-xs font-black uppercase tracking-widest text-slate-500">Trạng thái xuất bản</Label>
-                <Select value={formData.status} onValueChange={(val) => setFormData({...formData, status: val})}>
-                  <SelectTrigger className="bg-white border-slate-200 h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Bản nháp</SelectItem>
-                    <SelectItem value="published">Xuất bản</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Mô tả ngắn thu hút</Label>
+                <Textarea className="bg-white border-slate-200 rounded-2xl text-xs font-medium leading-relaxed h-24 shadow-sm" placeholder="Hiển thị ngoài trang chủ..." value={formData.excerpt} onChange={(e) => setFormData({...formData, excerpt: e.target.value})} />
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Danh mục</Label>
+                <Input className="bg-white border-slate-200 h-12 rounded-2xl font-bold shadow-sm" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
               </div>
             </div>
           </aside>
