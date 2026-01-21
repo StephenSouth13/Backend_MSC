@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
-const ITEMS_PER_PAGE = 8; // Số dự án trên mỗi trang
+const ITEMS_PER_PAGE = 8;
 
 function ProjectsManagementContent() {
   const [projects, setProjects] = useState<any[]>([])
@@ -28,12 +28,13 @@ function ProjectsManagementContent() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   
-  // States cho Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
   const [deletingProject, setDeletingProject] = useState<any>(null)
-
-  // 1. Hàm lấy dữ liệu có Phân trang (Pagination)
+  const handleReorder = (newOrder: any[]) => {
+  setProjects(newOrder);
+};
+  // // Nguồn: Cập nhật hàm fetch có ưu tiên sắp xếp theo order_index
   const fetchProjects = useCallback(async (page = 1, silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -42,13 +43,19 @@ function ProjectsManagementContent() {
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      // Query lấy dữ liệu và tổng số dòng cùng lúc
+      // // Nguồn logic sắp xếp: 
+      // 1. Ưu tiên order_index tăng dần (Số nhỏ 1, 2, 3 lên đầu)
+      // 2. Nếu trùng index hoặc không có, xếp theo created_at mới nhất
       const { data, error, count } = await supabase
         .from('projects')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
+  .select('*', { count: 'exact' })
+  // Ưu tiên 1: Theo thứ tự sắp xếp (số nhỏ lên đầu)
+  .order('order_index', { ascending: true }) 
+  // Ưu tiên 2: Dự án mới tạo lên đầu (nếu trùng index)
+  .order('created_at', { ascending: false }) 
+  .range(from, to);    
+     
+     
       if (error) throw error;
       
       setProjects(data || []);
@@ -65,7 +72,6 @@ function ProjectsManagementContent() {
     fetchProjects(currentPage);
   }, [currentPage, fetchProjects]);
 
-  // 2. Xử lý Chuyển trang
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -73,7 +79,6 @@ function ProjectsManagementContent() {
     }
   };
 
-  // 3. Logic tìm kiếm (Client-side cho trang hiện tại)
   const filteredProjects = useMemo(() => {
     return projects.filter(p =>
       p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -81,30 +86,22 @@ function ProjectsManagementContent() {
     );
   }, [projects, searchTerm]);
 
-  // 4. CRUD Callbacks - Đảm bảo đồng bộ DB
   const handleCreateSuccess = () => {
-    fetchProjects(1); // Reset về trang 1 để xem project mới nhất
+    fetchProjects(1);
     setIsCreateModalOpen(false);
-    toast({ title: "Thành công", description: "Dự án mới đã được lưu vào hệ thống." });
   };
 
   const handleUpdateSuccess = (updatedProject: any) => {
-    if (!updatedProject || !updatedProject.id) {
-    console.error("Dữ liệu cập nhật bị thiếu:", updatedProject);
-    return;
-  }
-    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    // // Nguồn: Khi cập nhật thành công, fetch lại toàn bộ trang để cập nhật đúng thứ tự mới
+    fetchProjects(currentPage, true);
     setEditingProject(null);
-    toast({ title: "Đã cập nhật", description: "Thông tin thay đổi đã được áp dụng." });
   };
 
   const handleDeleteConfirm = async (id: string) => {
     try {
       const { error } = await supabase.from('projects').delete().eq('id', id);
       if (error) throw error;
-      
-      toast({ title: "Đã xóa", description: "Dự án đã được loại bỏ." });
-      // Nếu xóa xong trang hiện tại trống thì lùi về 1 trang
+      toast({ title: "Đã xóa thành công" });
       if (projects.length === 1 && currentPage > 1) {
         setCurrentPage(prev => prev - 1);
       } else {
@@ -117,39 +114,39 @@ function ProjectsManagementContent() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto font-montserrat">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-800">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Dự án & Đối tác</h1>
-          <p className="text-slate-500 text-sm mt-1">Quản lý danh mục và đội ngũ chuyên gia Mentor</p>
+          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Hệ thống <span className="text-blue-500">Dự án</span></h1>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Sắp xếp mức độ ưu tiên hiển thị Portfolio</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => fetchProjects(currentPage, true)} disabled={isRefreshing}>
+          <Button variant="outline" size="icon" className="rounded-xl border-slate-700 text-white hover:bg-slate-800" onClick={() => fetchProjects(currentPage, true)} disabled={isRefreshing}>
             <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
-          <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-6">
-            <Plus className="h-5 w-5 mr-2" /> Tạo dự án
+          <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest px-8 h-12 rounded-xl shadow-lg shadow-blue-500/20">
+            <Plus className="h-4 w-4 mr-2" /> Thêm dự án mới
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
-      <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-        <CardHeader className="border-b border-slate-50 px-8 py-6">
-          <div className="flex flex-col md:flex-row justify-between gap-4">
+      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white">
+        <CardHeader className="border-b border-slate-50 px-10 py-8">
+          <div className="flex flex-col md:flex-row justify-between gap-6">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
-                placeholder="Tìm tên dự án, danh mục..." 
-                className="pl-10 bg-slate-50 border-none rounded-xl"
+                placeholder="TÌM KIẾM DỰ ÁN..." 
+                className="pl-12 bg-slate-50 border-none h-12 rounded-xl font-bold text-xs uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="px-4 py-1.5 rounded-lg border-slate-200 text-slate-600">
-                Tổng: {totalCount} dự án
+              <Badge className="bg-blue-50 text-blue-600 border-blue-100 px-5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest">
+                DATABASE: {totalCount} DỰ ÁN
               </Badge>
             </div>
           </div>
@@ -159,49 +156,50 @@ function ProjectsManagementContent() {
           <AnimatePresence mode="wait">
             {loading ? (
               <div className="py-40 flex flex-col items-center justify-center">
-                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-                <p className="text-slate-400 mt-4 font-medium italic">Đang tải dữ liệu...</p>
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+                <p className="text-slate-400 mt-6 font-black uppercase text-[10px] tracking-[0.3em]">Đang đồng bộ dữ liệu...</p>
               </div>
             ) : filteredProjects.length === 0 ? (
               <div className="py-40 text-center">
-                <AlertCircle className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-                <p className="text-slate-500 font-medium">Không tìm thấy dữ liệu phù hợp</p>
+                <AlertCircle className="h-16 w-16 text-slate-100 mx-auto mb-4" />
+                <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Không tìm thấy kết quả phù hợp</p>
               </div>
             ) : (
               <ProjectsTable 
-  projects={filteredProjects}
-  onEdit={setEditingProject}
-  onDelete={setDeletingProject}
-  currentPage={currentPage}
-  itemsPerPage={ITEMS_PER_PAGE}
-/>
+                projects={filteredProjects}
+                onEdit={setEditingProject}
+                onDelete={setDeletingProject}
+                currentPage={currentPage}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onReorder={handleReorder}
+              />
             )}
           </AnimatePresence>
         </CardContent>
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="px-8 py-6 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
-            <p className="text-sm text-slate-500">
-              Trang <strong>{currentPage}</strong> / {totalPages}
+          <div className="px-10 py-8 border-t border-slate-50 flex items-center justify-between bg-slate-50/30 font-montserrat">
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+              Trang <span className="text-blue-600">{currentPage}</span> / {totalPages}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="outline" 
                 size="sm" 
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
-                className="rounded-lg"
+                className="rounded-xl font-black text-[9px] uppercase tracking-tighter"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Trước
               </Button>
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 {[...Array(totalPages)].map((_, i) => (
                   <Button
                     key={i}
                     variant={currentPage === i + 1 ? "default" : "ghost"}
                     size="sm"
-                    className="w-8 h-8 p-0 rounded-md"
+                    className={`w-10 h-10 p-0 rounded-xl font-black text-[10px] ${currentPage === i + 1 ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : ''}`}
                     onClick={() => handlePageChange(i + 1)}
                   >
                     {i + 1}
@@ -213,7 +211,7 @@ function ProjectsManagementContent() {
                 size="sm" 
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
-                className="rounded-lg"
+                className="rounded-xl font-black text-[9px] uppercase tracking-tighter"
               >
                 Sau <ChevronRight className="h-4 w-4 ml-1" />
               </Button>

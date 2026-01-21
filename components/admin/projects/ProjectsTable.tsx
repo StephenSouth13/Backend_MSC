@@ -1,133 +1,119 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Edit3, Trash2, ExternalLink, Users, CalendarDays, History, Star } from "lucide-react"
-import { format } from "date-fns"
-import { vi } from "date-fns/locale"
+import { Button } from "@/components/ui/button"
+import { GripVertical, Edit3, Trash2, Star } from "lucide-react"
+import { toast } from '@/hooks/use-toast'
 
-// // Nguồn: Định nghĩa Interface cho Project để quản lý type an toàn
-interface Project {
-  id: string;
-  title: string;
-  category: string;
-  status: 'planning' | 'ongoing' | 'completed';
-  author_ids: string[];
-  featured: boolean;
-  created_at: string;
-  updated_at?: string;
-  slug: string;
-}
+// // Nguồn: Component con cho từng hàng để có thể kéo thả
+function SortableRow({ p, stt, onEdit, onDelete }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.id });
 
-// // Nguồn: Export named function đúng chuẩn để tránh lỗi Element Type Invalid
-export function ProjectsTable({ projects, onEdit, onDelete, currentPage, itemsPerPage }: any) {
-  
-  // // Nguồn: Định dạng thời gian chuẩn Magazine
-  const formatTime = (dateString: string) => {
-    if (!dateString) return "---";
-    return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: vi });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-emerald-50 text-emerald-600 border-emerald-100'
-      case 'ongoing': return 'bg-blue-50 text-blue-600 border-blue-100'
-      case 'planning': return 'bg-amber-50 text-amber-600 border-amber-100'
-      default: return 'bg-slate-50 text-slate-600'
-    }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : 'auto',
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
-    <div className="bg-white rounded-[2rem] border shadow-sm overflow-hidden font-montserrat">
-      <Table>
-        <TableHeader className="bg-slate-50/80">
-          <TableRow className="hover:bg-transparent border-b">
-            <TableHead className="w-[80px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Thứ tự</TableHead>
-            <TableHead className="min-w-[300px] font-black uppercase text-[10px] tracking-widest text-slate-400 text-left">Thông tin dự án / Lĩnh vực</TableHead>
-            <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Trạng thái</TableHead>
-            <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Nhân sự</TableHead>
-            <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400 text-right px-8">Thao tác</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {projects.map((p: Project, index: number) => {
-            // // Nguồn: Logic đánh số thứ tự chuẩn theo phân trang
-            const serialNumber = (currentPage - 1) * itemsPerPage + index + 1;
+    <TableRow ref={setNodeRef} style={style} className={`group hover:bg-slate-50/50 transition-all ${isDragging ? 'bg-blue-50 shadow-2xl' : ''}`}>
+      <TableCell className="w-[50px]">
+        {/* // Nguồn: Nút cầm để kéo */}
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-2 text-slate-300 hover:text-blue-500 transition-colors">
+          <GripVertical size={18} />
+        </button>
+      </TableCell>
+      <TableCell className="text-center font-black text-slate-300 italic text-sm">{stt}</TableCell>
+      <TableCell className="font-bold text-slate-800 uppercase text-sm">
+        <div className="flex items-center gap-2">
+          {p.title}
+          {p.featured && <Star size={12} className="fill-amber-400 text-amber-400" />}
+        </div>
+        <div className="text-[10px] text-blue-500 tracking-widest">{p.category}</div>
+      </TableCell>
+      <TableCell className="text-center">
+        <div className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-md">Vị trí: {p.order_index}</div>
+      </TableCell>
+      <TableCell className="text-right px-8 space-x-2">
+         <Button variant="ghost" size="icon" onClick={() => onEdit(p)} className="hover:text-blue-600"><Edit3 size={16}/></Button>
+         <Button variant="ghost" size="icon" onClick={() => onDelete(p)} className="hover:text-red-600"><Trash2 size={16}/></Button>
+      </TableCell>
+    </TableRow>
+  );
+}
 
-            return (
-              <TableRow key={p.id} className="group hover:bg-slate-50/50 transition-all border-b last:border-0">
-                <TableCell className="text-center font-black text-slate-300 text-sm italic">
-                  {serialNumber < 10 ? `0${serialNumber}` : serialNumber}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">
-                        {p.title}
-                      </span>
-                      {p.featured && (
-                        <div className="bg-amber-100 p-1 rounded-md">
-                          <Star size={10} className="text-amber-600 fill-amber-600" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                      <div className="w-1 h-1 rounded-full bg-blue-500" /> {p.category || 'Chưa phân loại'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={`${getStatusColor(p.status)} font-black uppercase text-[9px] tracking-tighter px-3 py-1 rounded-lg border-2`}>
-                    {p.status === 'ongoing' ? 'Đang thực thi' : p.status === 'completed' ? 'Đã hoàn thành' : 'Đang lên lịch'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                       <Users size={14} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-600 italic">
-                       {p.author_ids?.length || 0} Người phụ trách
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right px-8">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-10 w-10 p-0 rounded-xl hover:bg-white hover:shadow-md border border-transparent hover:border-slate-100 transition-all">
-                        <MoreHorizontal size={18} className="text-slate-400" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-100 font-montserrat">
-                      <DropdownMenuItem onClick={() => onEdit(p)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-blue-50 focus:text-blue-700 transition-all group">
-                        <Edit3 className="h-4 w-4 text-slate-400 group-hover:text-blue-600" /> 
-                        <span className="font-bold text-xs uppercase tracking-widest">Chỉnh sửa nội dung</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => window.open(`https://msc-center.edu.vn/du-an/${p.slug}`, '_blank')}
-                        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-slate-50 transition-all group"
-                      >
-                        <ExternalLink className="h-4 w-4 text-slate-400 group-hover:text-slate-900" /> 
-                        <span className="font-bold text-xs uppercase tracking-widest">Xem thực tế trên Web</span>
-                      </DropdownMenuItem>
-                      <div className="h-px bg-slate-100 my-1" />
-                      <DropdownMenuItem 
-                        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer focus:bg-red-50 focus:text-red-600 text-red-500 transition-all group" 
-                        onClick={() => onDelete(p)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-400 group-hover:text-red-600" /> 
-                        <span className="font-bold text-xs uppercase tracking-widest">Gỡ bỏ dự án này</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+export function ProjectsTable({ projects, onEdit, onDelete, currentPage, itemsPerPage, onReorder }: any) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // // Nguồn: Xử lý khi kết thúc kéo thả
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = projects.findIndex((i: any) => i.id === active.id);
+      const newIndex = projects.findIndex((i: any) => i.id === over?.id);
+      const newOrder = arrayMove(projects, oldIndex, newIndex);
+      
+      // Thông báo cho trang cha cập nhật UI tạm thời
+      onReorder(newOrder);
+
+      // // Nguồn: Cập nhật vị trí mới vào Database đồng loạt
+      try {
+        const updates = newOrder.map((p: any, idx: number) => ({
+          id: p.id,
+          order_index: (currentPage - 1) * itemsPerPage + idx + 1
+        }));
+
+        for (const up of updates) {
+          await supabase.from('projects').update({ order_index: up.order_index }).eq('id', up.id);
+        }
+        toast({ title: "Đã cập nhật thứ tự sắp xếp!" });
+      } catch (err) {
+        toast({ title: "Lỗi sắp xếp", variant: "destructive" });
+      }
+    }
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div className="bg-white rounded-[2rem] border shadow-sm overflow-hidden font-montserrat">
+        <Table>
+          <TableHeader className="bg-slate-900">
+            <TableRow className="hover:bg-transparent border-none">
+              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[80px] text-center font-black uppercase text-[10px] text-slate-400">STT</TableHead>
+              <TableHead className="font-black uppercase text-[10px] text-slate-400">Dự án & Lĩnh vực</TableHead>
+              <TableHead className="w-[100px] text-center font-black uppercase text-[10px] text-slate-400">Thứ tự</TableHead>
+              <TableHead className="text-right px-8 font-black uppercase text-[10px] text-slate-400">Thao tác</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <SortableContext items={projects.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
+              {projects.map((p: any, index: number) => (
+                <SortableRow 
+                  key={p.id} 
+                  p={p} 
+                  stt={(currentPage - 1) * itemsPerPage + index + 1} 
+                  onEdit={onEdit} 
+                  onDelete={onDelete} 
+                />
+              ))}
+            </SortableContext>
+          </TableBody>
+        </Table>
+      </div>
+    </DndContext>
   )
 }
