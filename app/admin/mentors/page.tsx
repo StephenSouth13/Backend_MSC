@@ -1,110 +1,164 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Users, Search, Loader2, Edit3, Trash2, Mail } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { useState, useEffect } from 'react'
+import { supabase, Mentor } from '@/lib/supabase'
+import { MentorTable } from '@/components/admin/mentors/MentorTable'
 import { MentorModal } from '@/components/admin/mentors/MentorModal'
+import { MentorDeleteModal } from '@/components/admin/mentors/MentorDeleteModal'
+import { MentorQuickView } from '@/components/admin/mentors/MentorQuickView'
+import { Button } from '@/components/ui/button'
+import { Plus, Search, RefreshCw, Award } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 
-
-export default function MentorsPage() {
-  const [mentors, setMentors] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+export default function MentorsAdminPage() {
+  const [mentors, setMentors] = useState<Mentor[]>([])
+  const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedMentor, setSelectedMentor] = useState<any>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // Quản lý trạng thái các Modal
+  const [modalState, setModalState] = useState({
+    addEdit: false,
+    delete: false,
+    view: false
+  })
+  const [currentMentor, setCurrentMentor] = useState<Mentor | null>(null)
 
-  const fetchMentors = useCallback(async () => {
+  // Hàm lấy dữ liệu từ bảng mentors
+  const fetchMentors = async () => {
     setLoading(true)
-    const { data } = await supabase.from('mentors').select('*').order('created_at', { ascending: false })
-    if (data) setMentors(data)
-    setLoading(false)
-  }, [])
+    try {
+      let query = supabase
+        .from('mentors')
+        .select('*')
+        .order('order', { ascending: true })
 
-  useEffect(() => { fetchMentors() }, [fetchMentors])
+      if (searchTerm) {
+        query = query.ilike('full_name', `%${searchTerm}%`)
+      }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa mentor này?")) return
-    const { error } = await supabase.from('mentors').delete().eq('id', id)
-    if (!error) {
-      toast({ title: "Đã xóa thành công" })
-      fetchMentors()
+      const { data, error } = await query
+      if (error) throw error
+      setMentors(data || [])
+    } catch (error: any) {
+      toast({ title: "Lỗi tải dữ liệu", description: error.message, variant: "destructive" })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const filteredMentors = mentors.filter(m => 
-    m.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  useEffect(() => {
+    fetchMentors()
+  }, [searchTerm])
+
+  // Hàm xử lý xóa mentor
+  const handleDelete = async () => {
+    if (!currentMentor) return
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('mentors')
+        .delete()
+        .eq('id', currentMentor.id)
+
+      if (error) throw error
+      
+      toast({ title: "Thành công", description: "Đã xóa hồ sơ chuyên gia." })
+      setModalState(prev => ({ ...prev, delete: false }))
+      fetchMentors()
+    } catch (error: any) {
+      toast({ title: "Lỗi xóa", description: error.message, variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="p-8 space-y-8 bg-slate-50/50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Đội ngũ Mentor</h1>
-          <p className="text-slate-500 font-medium mt-1">Quản lý và cập nhật danh sách chuyên gia MSC.</p>
+    <div className="p-10 space-y-10 min-h-screen bg-[#020202] text-white">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">
+            <Award className="text-white" size={28} />
+          </div>
+          <div>
+            <h1 className="text-4xl font-black uppercase tracking-tighter leading-none">Ban Giảng Huấn</h1>
+            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-2">
+              Hệ thống quản lý Magazine Profile Chuyên gia
+            </p>
+          </div>
         </div>
-        <Button onClick={() => { setSelectedMentor(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-6 shadow-lg shadow-blue-100">
-          <Plus className="mr-2 h-5 w-5" /> Thêm Mentor
+        
+        <Button 
+          onClick={() => { setCurrentMentor(null); setModalState(prev => ({ ...prev, addEdit: true })) }} 
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 h-12 font-black shadow-2xl shadow-blue-600/30 transition-all active:scale-95"
+        >
+          <Plus className="mr-2" /> THÊM CHUYÊN GIA MỚI
         </Button>
       </div>
 
-      <div className="relative max-w-md shadow-sm rounded-xl overflow-hidden">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <Input 
-          placeholder="Tìm tên chuyên gia..." 
-          className="pl-10 h-11 border-none bg-white focus-visible:ring-blue-400" 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Toolbar Section: Tìm kiếm & Refresh */}
+      <div className="flex gap-4 items-center bg-white/5 p-4 rounded-3xl border border-white/5">
+        <div className="relative flex-grow">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+          <Input 
+            className="bg-transparent border-none pl-12 h-12 text-white focus-visible:ring-0 placeholder:text-gray-600" 
+            placeholder="Tìm kiếm theo tên hoặc chức danh chuyên gia..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Button 
+          variant="ghost" 
+          onClick={fetchMentors} 
+          className="rounded-2xl hover:bg-white/10 h-12 w-12"
+          disabled={loading}
+        >
+          <RefreshCw className={`text-gray-400 ${loading ? "animate-spin" : ""}`} size={20}/>
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-blue-600 h-10 w-10" /></div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <AnimatePresence>
-            {filteredMentors.map((m) => (
-              <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} layout>
-                <Card className="border-none shadow-sm hover:shadow-xl transition-all group overflow-hidden bg-white">
-                  <CardContent className="p-0">
-                    <div className="h-1.5 bg-blue-500 w-full" />
-                    <div className="p-6 flex flex-col items-center text-center space-y-4">
-                      <Avatar className="h-20 w-20 border-4 border-slate-50 shadow-md group-hover:scale-110 transition-transform">
-                        <AvatarImage src={m.avatar_url} />
-                        <AvatarFallback className="bg-blue-50 text-blue-600 font-bold">{m.full_name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-bold text-slate-900 line-clamp-1">{m.full_name}</h3>
-                        <p className="text-xs text-blue-600 font-semibold uppercase mt-1">{m.title || 'Chuyên gia'}</p>
-                      </div>
-                      <div className="flex gap-2 w-full pt-4 border-t border-slate-50">
-                        <Button variant="outline" size="sm" className="flex-1 rounded-lg border-slate-100" onClick={() => { setSelectedMentor(m); setIsModalOpen(true); }}>
-                          <Edit3 size={14} className="mr-2" /> Sửa
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1 rounded-lg border-slate-100 text-red-400 hover:text-red-600" onClick={() => handleDelete(m.id)}>
-                          <Trash2 size={14} className="mr-2" /> Xóa
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+      {/* Main Table Content */}
+      <MentorTable 
+        mentors={mentors} 
+        onEdit={(m: Mentor) => { 
+          setCurrentMentor(m); 
+          setModalState(prev => ({ ...prev, addEdit: true })); 
+        }} 
+        onDelete={(m: Mentor) => { 
+          setCurrentMentor(m); 
+          setModalState(prev => ({ ...prev, delete: true })); 
+        }}
+        onView={(m: Mentor) => { 
+          setCurrentMentor(m); 
+          setModalState(prev => ({ ...prev, view: true })); 
+        }}
+      />
 
+      {/* --- Hệ thống Modals --- */}
+      
+      {/* Modal Thêm/Sửa: Đầy đủ các trường Magazine Profile */}
       <MentorModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        mentor={selectedMentor} 
+        isOpen={modalState.addEdit} 
+        onClose={() => setModalState(prev => ({ ...prev, addEdit: false }))} 
+        mentor={currentMentor} 
         onSuccess={fetchMentors} 
+      />
+
+      {/* Modal Xác nhận xóa an toàn */}
+      <MentorDeleteModal 
+        isOpen={modalState.delete} 
+        onClose={() => setModalState(prev => ({ ...prev, delete: false }))} 
+        onConfirm={handleDelete} 
+        mentor={currentMentor} 
+        loading={loading} 
+      />
+
+      {/* Modal Xem nhanh hồ sơ (Quick View) */}
+      <MentorQuickView 
+        isOpen={modalState.view} 
+        onClose={() => setModalState(prev => ({ ...prev, view: false }))} 
+        mentor={currentMentor} 
       />
     </div>
   )

@@ -1,10 +1,44 @@
+//D:\MSC\Backend_MSC\lib\supabase.ts
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
+// --- Interface cho Ban Giảng Huấn ---
+export interface Mentor {
+  id: string
+  full_name: string
+  slug: string
+  title: string
+  description: string
+  avatar_url: string
+  linkedin_url?: string
+  facebook_url?: string
+  portfolio_url?: string
+  specialties: string[]
+  background: {
+    education: string
+    experience: string
+  }
+  is_active: boolean
+  order: number
+  created_at?: string
+  updated_at?: string
+}
 
+// --- Interface cho Tác giả (Authors) ---
+export interface Author {
+  id: string
+  full_name: string
+  slug: string
+  title: string
+  avatar_url: string
+  bio?: string
+  linkedin_url?: string
+  website_url?: string
+  created_at?: string
+}
 export interface BlogPost {
   id: number
   slug: string
