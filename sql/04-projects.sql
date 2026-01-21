@@ -123,3 +123,26 @@ FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER update_project_documents_updated_at BEFORE UPDATE ON public.project_documents
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TABLE IF NOT EXISTS public.authors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT,             -- Chức danh (VD: Senior Mentor)
+    avatar_url TEXT,
+    type TEXT DEFAULT 'mentor', -- Để phân biệt 'mscer' hay 'mentor' phục vụ việc trỏ Link
+    bio TEXT,
+    linkedin_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Thêm Index để tìm kiếm nhanh
+CREATE INDEX IF NOT EXISTS idx_authors_slug ON public.authors(slug);
+
+
+-- Thêm cột số thứ tự sắp xếp vào bảng projects
+ALTER TABLE public.projects 
+ADD COLUMN IF NOT EXISTS order_index INTEGER DEFAULT 0;
+
+-- Tạo index để tối ưu tốc độ truy vấn theo thứ tự
+CREATE INDEX IF NOT EXISTS idx_projects_order_index ON public.projects(order_index ASC);
