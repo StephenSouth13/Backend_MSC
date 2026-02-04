@@ -11,56 +11,119 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from "@/components/ui/badge"
 import { 
   Loader2, Save, FolderPlus, Upload, X, Star, 
-  CheckCircle2, Lock, Unlock, Search,Edit, Globe 
+  Lock, Unlock, Search, Edit, Tag, Palette, Type, Video, Film, Bold, Italic, Underline as UnderlineIcon, Globe
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+
+// TIPTAP NAMED IMPORTS - ĐÃ FIX LỖI TS2613 & ENOENT
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import { Highlight } from '@tiptap/extension-highlight'
+import { Underline } from '@tiptap/extension-underline'
+
+// 1. TOOLBAR SOẠN THẢO CHI TIẾT (MÀU SẮC & ĐỊNH DẠNG)
+const MenuBar = ({ editor }: { editor: any }) => {
+  if (!editor) return null
+  return (
+    <div className="flex flex-wrap gap-1 p-2 bg-slate-100 rounded-t-[1.5rem] border-b border-slate-200 sticky top-0 z-10">
+      <div className="flex bg-white rounded-lg border p-0.5 shadow-sm mr-2">
+        <Button 
+          type="button" variant="ghost" size="sm" 
+          onClick={() => editor.chain().focus().toggleBold().run()} 
+          className={`h-8 w-8 p-0 ${editor.isActive('bold') ? 'bg-blue-50 text-blue-600' : ''}`}
+        >
+          <Bold size={14}/>
+        </Button>
+        <Button 
+          type="button" variant="ghost" size="sm" 
+          onClick={() => editor.chain().focus().toggleItalic().run()} 
+          className={`h-8 w-8 p-0 ${editor.isActive('italic') ? 'bg-blue-50 text-blue-600' : ''}`}
+        >
+          <Italic size={14}/>
+        </Button>
+        <Button 
+          type="button" variant="ghost" size="sm" 
+          onClick={() => editor.chain().focus().toggleUnderline().run()} 
+          className={`h-8 w-8 p-0 ${editor.isActive('underline') ? 'bg-blue-50 text-blue-600' : ''}`}
+        >
+          <UnderlineIcon size={14}/>
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2 bg-white rounded-lg border px-3 py-0.5 shadow-sm mr-2">
+        <Label className="text-[9px] font-black uppercase text-slate-400">Màu chữ:</Label>
+        <input 
+          type="color" 
+          onInput={(e: any) => editor.chain().focus().setColor(e.target.value).run()}
+          value={editor.getAttributes('textStyle').color || '#000000'}
+          className="w-6 h-6 p-0 border border-slate-200 rounded-full cursor-pointer overflow-hidden"
+        />
+        <Button 
+          type="button" variant="ghost" size="sm" 
+          onClick={() => editor.chain().focus().toggleHighlight().run()} 
+          className={`h-8 px-2 text-[10px] font-bold ${editor.isActive('highlight') ? 'bg-yellow-200 text-yellow-800' : ''}`}
+        >
+          <Palette size={12} className="mr-1"/> HIGHLIGHT
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export function CreateProjectModal({ isOpen, onClose, onSuccess }: any) {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [authors, setAuthors] = useState<any[]>([]) 
-  const [isSlugLocked, setIsSlugLocked] = useState(true) // // Nguồn: Khóa slug để tự động tạo theo tiêu đề
+  const [isSlugLocked, setIsSlugLocked] = useState(true)
   
   const [formData, setFormData] = useState({
     title: '', 
     slug: '', 
-    category: '', 
-    description: '', // Mô tả ngắn (SEO Description)
+    category: '', // Chính là Tag name / Lĩnh vực hiển thị trong bảng
+    description: '', 
     detailproject: '', 
     image: '', 
+    video_url: '', 
     status: 'ongoing', 
     author_ids: [] as string[], 
     featured: false,
-    seo_title: '', // // Nguồn: Thêm SEO Title
-    seo_keywords: '' // // Nguồn: Thêm Keywords
+    seo_title: '', 
+    seo_keywords: ''
+  })
+
+  // 2. KHỞI TẠO TIPTAP - ĐÃ FIX LỖI SSR
+  const editor = useEditor({
+    extensions: [
+      StarterKit, 
+      TextStyle, 
+      Color, 
+      Highlight.configure({ multicolor: true }), 
+      Underline
+    ],
+    content: '',
+    immediatelyRender: false,
+    onUpdate: ({ editor }) => {
+      setFormData(prev => ({ ...prev, detailproject: editor.getHTML() }))
+    }
   })
 
   useEffect(() => {
     const fetchAuthors = async () => {
       if (!isOpen) return;
       try {
-        const { data, error } = await supabase
-          .from('authors')
-          .select('id, full_name, avatar_url, title')
-          .order('full_name', { ascending: true });
+        const { data, error } = await supabase.from('authors').select('id, full_name, avatar_url, title').order('full_name', { ascending: true });
         if (error) throw error;
         setAuthors(data || []);
-      } catch (err: any) {
-        console.error("❌ Lỗi load chuyên gia:", err.message);
-      }
+      } catch (err: any) { console.error("Load Authors Error:", err.message); }
     };
     fetchAuthors();
   }, [isOpen])
 
-  // // Nguồn: Hàm tạo Slug chuẩn SEO Quốc tế
+  // 3. LOGIC GENERATE SLUG TỰ ĐỘNG
   const generateSlug = (text: string) => {
-    return text.toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Khử dấu
-      .replace(/[đĐ]/g, "d") // Xử lý chữ đ
-      .replace(/([^0-9a-z-\s])/g, "") // Xóa ký tự đặc biệt
-      .replace(/(\s+)/g, "-") // Thay khoảng trắng bằng -
-      .replace(/-+/g, "-") // Xóa gạch ngang thừa
-      .replace(/^-+|-+$/g, ""); // Xóa gạch ngang đầu cuối
+    return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").replace(/([^0-9a-z-\s])/g, "").replace(/(\s+)/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
   }
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,221 +136,160 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: any) {
     }));
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 4. UPLOAD MEDIA CENTER
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
     try {
       setUploading(true)
       const file = e.target.files?.[0]
       if (!file) return
-      const fileName = `${Date.now()}.${file.name.split('.').pop()}`
-      const filePath = `project-thumbnails/${fileName}`
-      const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file)
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+      const folder = type === 'image' ? 'project-thumbnails' : 'project-videos'
+      const { error: uploadError } = await supabase.storage.from('media').upload(`${folder}/${fileName}`, file)
       if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('media').getPublicUrl(filePath)
-      setFormData({ ...formData, image: data.publicUrl })
-      toast({ title: "Tải ảnh thành công!" })
-    } catch (error: any) {
-      toast({ title: "Lỗi tải ảnh", description: error.message, variant: "destructive" })
-    } finally { setUploading(false) }
+      const { data } = supabase.storage.from('media').getPublicUrl(`${folder}/${fileName}`)
+      setFormData(prev => ({ ...prev, [type === 'image' ? 'image' : 'video_url']: data.publicUrl }))
+      toast({ title: `Tải lên thành công!` })
+    } catch (error: any) { toast({ title: "Lỗi tải tệp", description: error.message, variant: "destructive" }) }
+    finally { setUploading(false) }
   }
 
   const handleSave = async () => {
-    if (!formData.title || !formData.slug) return toast({ title: "Thiếu tiêu đề hoặc Slug", variant: "destructive" });
-    if (!formData.image) return toast({ title: "Vui lòng tải ảnh bìa", variant: "destructive" });
-
+    if (!formData.title || !formData.slug) return toast({ title: "Vui lòng nhập tiêu đề và slug", variant: "destructive" });
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert([{
-          ...formData,
-          title: formData.title.trim(),
-          slug: formData.slug.trim(),
-          author_ids: formData.author_ids || []
-        }])
-        .select();
-
+      const { data, error } = await supabase.from('projects').insert([formData]).select();
       if (error) throw error;
-      if (data) {
-        onSuccess(data[0]);
-        toast({ title: "Tạo dự án thành công!" });
-        onClose();
-        setFormData({ title: '', slug: '', category: '', description: '', detailproject: '', image: '', status: 'ongoing', author_ids: [], featured: false, seo_title: '', seo_keywords: '' });
-      }
-    } catch (error: any) {
-      toast({ title: "Lỗi tạo dự án", description: error.message, variant: "destructive" });
-    } finally { setLoading(false); }
+      onSuccess(data[0]);
+      onClose();
+      editor?.commands.setContent('');
+      toast({ title: "Dự án đã được khởi tạo thành công!" });
+    } catch (error: any) { toast({ title: "Lỗi", description: error.message, variant: "destructive" }); }
+    finally { setLoading(false); }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-white border-none shadow-2xl rounded-[2.5rem] p-0 font-montserrat">
-        <DialogHeader className="p-8 bg-slate-50 border-b">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-600 rounded-2xl shadow-lg">
-              <FolderPlus className="text-white h-6 w-6" />
-            </div>
+      <DialogContent className="max-w-[1200px] w-[95vw] max-h-[95vh] overflow-y-auto bg-white rounded-[2.5rem] p-0 font-montserrat shadow-2xl border-none">
+        <DialogHeader className="p-8 bg-slate-900 text-white rounded-t-[2.5rem]">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-blue-600 rounded-2xl shadow-lg text-white"><FolderPlus size={28} /></div>
             <div>
-              <DialogTitle className="text-2xl font-black uppercase tracking-tight text-slate-800">Cấu hình dự án & SEO</DialogTitle>
-              <DialogDescription className="font-medium text-slate-500 italic">Tối ưu hóa nội dung hiển thị và khả năng tìm kiếm trên Google.</DialogDescription>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight italic">Cấu hình dự án <span className="text-blue-400">Portfolio</span></DialogTitle>
+              <DialogDescription className="text-slate-400 font-medium text-[11px] uppercase tracking-[0.2em] mt-1">MSC Center CMS Professional v3.0</DialogDescription>
             </div>
           </div>
         </DialogHeader>
-        
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
-          {/* CỘT TRÁI: NỘI DUNG & SEO */}
-          <div className="md:col-span-8 p-8 space-y-8 border-r">
-            
-            {/* PHẦN 1: THÔNG TIN CƠ BẢN */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-[11px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
-                  <Edit size={12}/> Tiêu đề chính (H1)
-                </Label>
-                <Input 
-                  className="h-14 text-xl font-bold border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500"
-                  value={formData.title} 
-                  onChange={handleTitleChange} 
-                  placeholder="VD: Dự án Đào tạo Doanh nghiệp Vinfast 2024" 
-                />
-              </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
+          {/* CỘT TRÁI: SOẠN THẢO & SEO */}
+          <div className="md:col-span-8 p-10 space-y-10 border-r border-slate-100">
+            {/* THÔNG TIN CHÍNH */}
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <Label className="text-[11px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Edit size={12}/> Tiêu đề dự án (H1)</Label>
+                <Input className="h-14 text-lg font-bold rounded-2xl border-slate-200" value={formData.title} onChange={handleTitleChange} />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-[11px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Tag size={12}/> Tag Name (Lĩnh vực dự án)</Label>
+                <Input className="h-14 font-bold rounded-2xl border-slate-200" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} placeholder="VD: ĐÀO TẠO DOANH NGHIỆP" />
+              </div>
+            </div>
+
+            {/* SLUG & SEO TITLE (Tiêu đề nhỏ) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                    <Search size={12}/> Đường dẫn URL (Slug SEO)
-                  </Label>
-                  <Button 
-                    variant="ghost" size="sm" 
-                    className="h-7 text-[10px] font-bold gap-1 text-slate-400"
-                    onClick={() => setIsSlugLocked(!isSlugLocked)}
-                  >
+                  <Label className="text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><Search size={12}/> URL SEO (Slug)</Label>
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px] font-bold" onClick={() => setIsSlugLocked(!isSlugLocked)}>
                     {isSlugLocked ? <Lock size={12}/> : <Unlock size={12} className="text-amber-500"/>}
-                    {isSlugLocked ? "ĐANG TỰ ĐỘNG" : "TỰ CHỈNH TAY"}
                   </Button>
                 </div>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-xs font-bold italic">msc-center.edu.vn/du-an/</div>
-                  <Input 
-                    className={`h-12 pl-[155px] font-mono text-xs font-bold rounded-xl ${isSlugLocked ? 'bg-slate-50 text-slate-400' : 'bg-amber-50 text-amber-600 border-amber-200'}`}
-                    value={formData.slug} 
-                    readOnly={isSlugLocked}
-                    onChange={(e) => setFormData({...formData, slug: generateSlug(e.target.value)})}
-                  />
-                </div>
+                <Input className={`h-12 font-mono text-xs font-bold rounded-xl ${isSlugLocked ? 'bg-slate-50' : 'bg-amber-50 border-amber-200'}`} value={formData.slug} readOnly={isSlugLocked} onChange={(e) => setFormData({...formData, slug: generateSlug(e.target.value)})} />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><Globe size={12}/> SEO Title (Tiêu đề Google)</Label>
+                <Input className="h-12 text-xs font-bold rounded-xl bg-slate-50/50" value={formData.seo_title} onChange={(e) => setFormData({...formData, seo_title: e.target.value})} placeholder="Tiêu đề hiển thị trên thanh trình duyệt..." />
               </div>
             </div>
 
-            {/* PHẦN 2: SEO METADATA */}
-            <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-5">
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-blue-500"/> Cấu hình SEO (Metadata)
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500">SEO Title (Tiêu đề hiển thị trên Google)</Label>
-                  <Input 
-                    className="bg-white border-slate-200" 
-                    value={formData.seo_title} 
-                    onChange={(e) => setFormData({...formData, seo_title: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold text-slate-500">Meta Description (Mô tả hiển thị Google)</Label>
-                  <Textarea 
-                    rows={2} className="bg-white border-slate-200 text-xs" 
-                    value={formData.description} 
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Viết 150-160 ký tự để tối ưu tìm kiếm..."
-                  />
-                </div>
+            {/* RICH TEXT EDITOR */}
+            <div className="space-y-4">
+              <Label className="text-[11px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2"><Type size={12}/> Nội dung chi tiết (Soạn thảo chuyên sâu)</Label>
+              <div className="border-2 border-slate-100 rounded-[1.5rem] overflow-hidden focus-within:border-blue-400 transition-all bg-white shadow-inner">
+                <MenuBar editor={editor} />
+                <EditorContent editor={editor} className="p-8 min-h-[450px] prose prose-blue max-w-none focus:outline-none" />
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Nội dung chi tiết dự án</Label>
-              <Textarea 
-                className="min-h-[350px] font-mono border-slate-200 rounded-2xl p-6 leading-relaxed bg-slate-50/20" 
-                value={formData.detailproject} 
-                onChange={(e) => setFormData({...formData, detailproject: e.target.value})} 
-                placeholder="Viết nội dung bài viết bằng Markdown..." 
-              />
             </div>
           </div>
 
-          {/* CỘT PHẢI: CHUYÊN GIA & MEDIA */}
-          <div className="md:col-span-4 bg-slate-50/50 p-8 space-y-8">
-            {/* THUMBNAIL */}
-            <div className="space-y-3">
-              <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Ảnh đại diện SEO (Thumbnail)</Label>
-              <div className="relative aspect-video border-2 border-dashed border-slate-300 rounded-[2rem] bg-white flex flex-col items-center justify-center overflow-hidden group hover:border-blue-400 transition-all shadow-inner">
+          {/* CỘT PHẢI: MEDIA & TEAM */}
+          <div className="md:col-span-4 bg-slate-50/50 p-10 space-y-10">
+            <div className="space-y-4">
+              <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Thumbnail Dự án</Label>
+              <div className="relative aspect-video border-2 border-dashed border-slate-300 rounded-[2rem] bg-white flex flex-col items-center justify-center overflow-hidden hover:border-blue-500 transition-all shadow-sm">
                 {formData.image ? (
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-full group">
                     <img src={formData.image} className="w-full h-full object-cover" alt="Preview" />
-                    <button className="absolute top-4 right-4 bg-red-500 p-2 rounded-full text-white shadow-xl hover:scale-110 transition-transform" onClick={() => setFormData({...formData, image: ''})}><X size={16} /></button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button variant="destructive" size="icon" className="rounded-full shadow-xl" onClick={() => setFormData({...formData, image: ''})}><X size={18} /></Button>
+                    </div>
                   </div>
                 ) : (
-                  <label className="cursor-pointer flex flex-col items-center gap-3 p-6 text-center">
-                    <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-500">
-                      {uploading ? <Loader2 className="animate-spin" /> : <Upload size={20} />}
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-slate-400">Tải ảnh chất lượng cao</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
+                  <label className="cursor-pointer flex flex-col items-center p-8 text-center gap-3">
+                    <div className="p-4 bg-blue-50 text-blue-600 rounded-full shadow-sm">{uploading ? <Loader2 className="animate-spin" /> : <Upload size={24} />}</div>
+                    <span className="text-[10px] font-black uppercase text-slate-400">Tải ảnh bìa</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleMediaUpload(e, 'image')} />
                   </label>
                 )}
               </div>
             </div>
 
-            {/* PHẦN CHỌN CHUYÊN GIA */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Chuyên gia phụ trách</Label>
-                <Badge className="bg-blue-600 font-black text-[9px]">{formData.author_ids.length} Đã chọn</Badge>
+              <Label className="text-[11px] font-black uppercase text-slate-500 flex items-center gap-2"><Film size={12}/> Video Giới thiệu</Label>
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <Input placeholder="Dán link Youtube..." className="text-xs h-10 rounded-xl bg-slate-50" value={formData.video_url} onChange={(e) => setFormData({...formData, video_url: e.target.value})} />
+                <div className="relative border-2 border-dashed border-slate-100 rounded-2xl p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50">
+                  <Video size={18} className="text-slate-300" />
+                  <span className="text-[9px] font-bold text-slate-400">Hoặc tải file MP4</span>
+                  <input type="file" className="hidden" accept="video/*" onChange={(e) => handleMediaUpload(e, 'video')} />
+                </div>
               </div>
-              <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar bg-white p-2 rounded-2xl border border-slate-200">
+            </div>
+
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[11px] font-black uppercase text-slate-500">Mentoring & Coaching</Label>
+                <Badge className="bg-blue-600 font-black text-[9px] uppercase shadow-md">{formData.author_ids.length} Chọn</Badge>
+              </div>
+              <div className="grid gap-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar bg-white p-3 rounded-[1.5rem] border border-slate-200">
                 {authors.map(a => {
                   const isSelected = formData.author_ids.includes(a.id);
                   return (
                     <div 
                       key={a.id} 
                       onClick={() => setFormData({...formData, author_ids: isSelected ? formData.author_ids.filter(id => id !== a.id) : [...formData.author_ids, a.id]})}
-                      className={`flex items-center gap-3 p-2 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-blue-600 bg-blue-50/50' : 'border-slate-50 bg-slate-50/30 hover:border-blue-200'}`}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50/50 shadow-sm' : 'border-transparent bg-slate-50/30'}`}
                     >
                       <Avatar className="h-9 w-9 border-2 border-white shadow-sm shrink-0">
                         <AvatarImage src={a.avatar_url} className="object-cover" />
-                        <AvatarFallback className="text-xs bg-slate-200 font-black">{a.full_name?.substring(0,2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="font-black text-[10px] bg-slate-200 uppercase">{a.full_name?.substring(0,2)}</AvatarFallback>
                       </Avatar>
-                      <div className="flex flex-col overflow-hidden">
-                        <span className={`text-[10px] font-black uppercase truncate ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>{a.full_name}</span>
-                        <span className="text-[8px] font-bold text-slate-400 truncate italic">{a.title || 'Chuyên gia'}</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-[11px] font-black uppercase truncate ${isSelected ? 'text-blue-700' : 'text-slate-600'}`}>{a.full_name}</span>
+                        <span className="text-[9px] text-slate-400 font-bold italic truncate">{a.title || 'Mentor'}</span>
                       </div>
                     </div>
                   )
                 })}
               </div>
             </div>
-
-            {/* DỰ ÁN TIÊU BIỂU */}
-            <div 
-              className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${formData.featured ? 'border-yellow-400 bg-yellow-50 shadow-md shadow-yellow-100' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-              onClick={() => setFormData({...formData, featured: !formData.featured})}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${formData.featured ? 'bg-yellow-400' : 'bg-slate-100'}`}>
-                  <Star size={16} className={formData.featured ? 'text-white fill-white' : 'text-slate-400'} />
-                </div>
-                <span className="text-[10px] font-black uppercase text-slate-600">Dự án tiêu biểu</span>
-              </div>
-              <div className={`w-10 h-5 rounded-full relative transition-colors ${formData.featured ? 'bg-yellow-400' : 'bg-slate-200'}`}>
-                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${formData.featured ? 'right-1' : 'left-1'}`} />
-              </div>
-            </div>
           </div>
         </div>
 
-        <DialogFooter className="p-8 bg-white border-t flex justify-between items-center">
-          <Button variant="ghost" onClick={onClose} disabled={loading} className="font-black uppercase text-[10px] text-slate-400">Đóng</Button>
+        <DialogFooter className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center rounded-b-[2.5rem]">
+          <Button variant="ghost" onClick={onClose} disabled={loading} className="font-black uppercase text-[10px] text-slate-400">Huỷ bỏ</Button>
           <Button disabled={loading || uploading} className="h-14 px-12 bg-blue-700 hover:bg-blue-800 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all" onClick={handleSave}>
-            {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} Lưu dự án
+            {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Xuất bản ngay
           </Button>
         </DialogFooter>
       </DialogContent>

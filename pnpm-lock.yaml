@@ -116,9 +116,15 @@ importers:
       '@tiptap/extension-color':
         specifier: ^3.4.4
         version: 3.6.0(@tiptap/extension-text-style@3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0)))
+      '@tiptap/extension-highlight':
+        specifier: ^3.19.0
+        version: 3.19.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
       '@tiptap/extension-text-style':
         specifier: ^3.4.4
         version: 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
+      '@tiptap/extension-underline':
+        specifier: ^3.19.0
+        version: 3.19.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
       '@tiptap/react':
         specifier: ^3.4.4
         version: 3.6.0(@floating-ui/dom@1.7.4)(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))(@tiptap/pm@3.6.0)(@types/react-dom@18.3.7(@types/react@18.3.24))(@types/react@18.3.24)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1187,6 +1193,11 @@ packages:
     peerDependencies:
       '@tiptap/core': ^3.6.0
 
+  '@tiptap/extension-highlight@3.19.0':
+    resolution: {integrity: sha512-MYwSDCh/aG12KXw30XmHwrruElBRB8b7Ou0jd8n8H2oXb+QexVqnMa2+ylkuTAl+2D5PR7zdIIOeeHRSTmkPPw==}
+    peerDependencies:
+      '@tiptap/core': ^3.19.0
+
   '@tiptap/extension-horizontal-rule@3.6.0':
     resolution: {integrity: sha512-b3E6OtbB1jSlyjaoSBVSBI6Qxw2bc0YVt8ZW54ICeMFcP5z8LQpPgqVpKBs8hejLXDyMEVLqEfo7UwvBAS9Qtg==}
     peerDependencies:
@@ -1245,10 +1256,10 @@ packages:
     peerDependencies:
       '@tiptap/core': ^3.6.0
 
-  '@tiptap/extension-underline@3.6.0':
-    resolution: {integrity: sha512-iQDc093ihe0DdTRK9NDPnaiFkuunmoyq7hUv1DHUk8dr67KpyHcMvRcF11SX2qIjfR3L4GDvSNpwey4XFjw8YA==}
+  '@tiptap/extension-underline@3.19.0':
+    resolution: {integrity: sha512-800MGEWfG49j10wQzAFiW/ele1HT04MamcL8iyuPNu7ZbjbGN2yknvdrJlRy7hZlzIrVkZMr/1tz62KN33VHIw==}
     peerDependencies:
-      '@tiptap/core': ^3.6.0
+      '@tiptap/core': ^3.19.0
 
   '@tiptap/extensions@3.6.0':
     resolution: {integrity: sha512-EKLvM3XTE4YkCur0DR34xczCONUr4C4PMjjE2Y0W8x5vkftltyEJBQHnYJ/1DIGeThSAc6eQ1DF9h9c0I/O6dg==}
@@ -3747,6 +3758,10 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.6.0(@tiptap/pm@3.6.0)
 
+  '@tiptap/extension-highlight@3.19.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))':
+    dependencies:
+      '@tiptap/core': 3.6.0(@tiptap/pm@3.6.0)
+
   '@tiptap/extension-horizontal-rule@3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))(@tiptap/pm@3.6.0)':
     dependencies:
       '@tiptap/core': 3.6.0(@tiptap/pm@3.6.0)
@@ -3795,7 +3810,7 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.6.0(@tiptap/pm@3.6.0)
 
-  '@tiptap/extension-underline@3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))':
+  '@tiptap/extension-underline@3.19.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))':
     dependencies:
       '@tiptap/core': 3.6.0(@tiptap/pm@3.6.0)
 
@@ -3865,7 +3880,7 @@ snapshots:
       '@tiptap/extension-paragraph': 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
       '@tiptap/extension-strike': 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
       '@tiptap/extension-text': 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
-      '@tiptap/extension-underline': 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
+      '@tiptap/extension-underline': 3.19.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))
       '@tiptap/extensions': 3.6.0(@tiptap/core@3.6.0(@tiptap/pm@3.6.0))(@tiptap/pm@3.6.0)
       '@tiptap/pm': 3.6.0
 

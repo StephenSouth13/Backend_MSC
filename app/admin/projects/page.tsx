@@ -31,10 +31,11 @@ function ProjectsManagementContent() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
   const [deletingProject, setDeletingProject] = useState<any>(null)
+
   const handleReorder = (newOrder: any[]) => {
-  setProjects(newOrder);
-};
-  // // Nguồn: Cập nhật hàm fetch có ưu tiên sắp xếp theo order_index
+    setProjects(newOrder);
+  };
+
   const fetchProjects = useCallback(async (page = 1, silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -43,19 +44,14 @@ function ProjectsManagementContent() {
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      // // Nguồn logic sắp xếp: 
-      // 1. Ưu tiên order_index tăng dần (Số nhỏ 1, 2, 3 lên đầu)
-      // 2. Nếu trùng index hoặc không có, xếp theo created_at mới nhất
+      // Logic sắp xếp: Ưu tiên order_index tăng dần, sau đó đến created_at mới nhất
       const { data, error, count } = await supabase
         .from('projects')
-  .select('*', { count: 'exact' })
-  // Ưu tiên 1: Theo thứ tự sắp xếp (số nhỏ lên đầu)
-  .order('order_index', { ascending: true }) 
-  // Ưu tiên 2: Dự án mới tạo lên đầu (nếu trùng index)
-  .order('created_at', { ascending: false }) 
-  .range(from, to);    
-     
-     
+        .select('*', { count: 'exact' })
+        .order('order_index', { ascending: true }) 
+        .order('created_at', { ascending: false }) 
+        .range(from, to);    
+      
       if (error) throw error;
       
       setProjects(data || []);
@@ -91,8 +87,7 @@ function ProjectsManagementContent() {
     setIsCreateModalOpen(false);
   };
 
-  const handleUpdateSuccess = (updatedProject: any) => {
-    // // Nguồn: Khi cập nhật thành công, fetch lại toàn bộ trang để cập nhật đúng thứ tự mới
+  const handleUpdateSuccess = () => {
     fetchProjects(currentPage, true);
     setEditingProject(null);
   };
@@ -115,11 +110,15 @@ function ProjectsManagementContent() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto font-montserrat">
-      {/* Header Section */}
+      {/* Header Section - Đã tối ưu hóa Montserrat & Italic */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-800">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Hệ thống <span className="text-blue-500">Dự án</span></h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">Sắp xếp mức độ ưu tiên hiển thị Portfolio</p>
+          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">
+            Hệ thống <span className="text-blue-500">Dự án</span>
+          </h1>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1">
+            Quản trị & Sắp xếp mức độ ưu tiên hiển thị Portfolio
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" className="rounded-xl border-slate-700 text-white hover:bg-slate-800" onClick={() => fetchProjects(currentPage, true)} disabled={isRefreshing}>
@@ -139,7 +138,7 @@ function ProjectsManagementContent() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
                 placeholder="TÌM KIẾM DỰ ÁN..." 
-                className="pl-12 bg-slate-50 border-none h-12 rounded-xl font-bold text-xs uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20"
+                className="pl-12 bg-slate-50 border-none h-12 rounded-xl font-black text-[10px] uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -177,9 +176,9 @@ function ProjectsManagementContent() {
           </AnimatePresence>
         </CardContent>
 
-        {/* Pagination Footer */}
+        {/* Pagination Footer - Đã tinh chỉnh font Montserrat */}
         {totalPages > 1 && (
-          <div className="px-10 py-8 border-t border-slate-50 flex items-center justify-between bg-slate-50/30 font-montserrat">
+          <div className="px-10 py-8 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
               Trang <span className="text-blue-600">{currentPage}</span> / {totalPages}
             </p>
@@ -199,7 +198,7 @@ function ProjectsManagementContent() {
                     key={i}
                     variant={currentPage === i + 1 ? "default" : "ghost"}
                     size="sm"
-                    className={`w-10 h-10 p-0 rounded-xl font-black text-[10px] ${currentPage === i + 1 ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : ''}`}
+                    className={`w-10 h-10 p-0 rounded-xl font-black text-[10px] ${currentPage === i + 1 ? 'bg-blue-600 shadow-lg shadow-blue-500/30 text-white' : ''}`}
                     onClick={() => handlePageChange(i + 1)}
                   >
                     {i + 1}
@@ -220,7 +219,7 @@ function ProjectsManagementContent() {
         )}
       </Card>
 
-      {/* Modals */}
+      {/* Modals - Truyền props chuẩn để kích hoạt CRUD */}
       <CreateProjectModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)} 
