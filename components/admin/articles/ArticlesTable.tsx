@@ -1,3 +1,4 @@
+//D:\MSC\Backend_MSC\components\admin\articles\ArticlesTable.tsx
 "use client"
 
 import { Button } from '@/components/ui/button'

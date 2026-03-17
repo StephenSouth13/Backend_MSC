@@ -36,6 +36,13 @@ const adminMenuItems = [
     icon: LayoutDashboard,
     roles: ['admin', 'collab']
   },
+  // --- THÊM MỤC NÀY VÀO ---
+  {
+    title: 'Chương trình Đào tạo',
+    href: '/admin/training',
+    icon: BookOpen,
+    roles: ['admin', 'collab']
+  },
   {
     title: 'Quản lý MSCers', // Đội ngũ nhân sự MSC
     href: '/admin/mscers',

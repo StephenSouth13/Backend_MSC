@@ -91,3 +91,28 @@ export interface BlogPostCreate {
     keywords?: string[]
   }
 }
+// --- Interface cho Chương trình Đào tạo (Programs) ---
+export interface Program {
+  id: string
+  title: string
+  slug: string
+  description?: string
+  content: any           // Dữ liệu JSONB từ Tiptap
+  image?: string         
+  level: string          // 'Cơ bản' | 'Trung cấp' | 'Nâng cao' | 'Chuyên gia'
+  category?: string
+  price?: string
+  duration?: string
+  students?: string
+  status: 'draft' | 'published'
+  is_featured?: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgramSchedule {
+  id: string
+  program_id: string
+  start_date: string
+  status: 'opening' | 'full' | 'closed'
+}
