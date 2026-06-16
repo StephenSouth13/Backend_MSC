@@ -1,3 +1,4 @@
+//D:\MSC\Backend_MSC\app\admin\training\[id]\page.tsx
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
